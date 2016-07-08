@@ -95,8 +95,8 @@ public class CommandClasses
 	 */
 	public long getLevelUpdateTime()
 	{
-		DataElemObject ii = getCommandClassesData().getDataElem(
-				CommandClassesData.FIELD_LEVEL);
+		DataElemObject ii = getCommandClassesData()
+				.getDataElem(CommandClassesData.FIELD_LEVEL);
 
 		if (ii != null)
 			return ii.getUpdateTime();
@@ -112,20 +112,20 @@ public class CommandClasses
 	public int getLevelAsInt()
 	{
 		int value = DataConst.INVALID;
-		
-		Object iiObj = getCommandClassesData().getDataElemValue(
-				CommandClassesData.FIELD_LEVEL);
+
+		Object iiObj = getCommandClassesData()
+				.getDataElemValue(CommandClassesData.FIELD_LEVEL);
 
 		// patch for versions higher than 1.3.1
 		if (iiObj instanceof Integer)
 		{
-			value = ((Integer) iiObj).intValue();	
+			value = ((Integer) iiObj).intValue();
 		}
-		else if(iiObj instanceof Boolean)
+		else if (iiObj instanceof Boolean)
 		{
 			Boolean ii = (Boolean) iiObj;
-			
-			if(ii)
+
+			if (ii)
 				value = 255;
 			else
 				value = 0;
@@ -136,8 +136,8 @@ public class CommandClasses
 
 	public boolean getLevelAsBoolean()
 	{
-		Boolean ii = (Boolean) getCommandClassesData().getDataElemValue(
-				CommandClassesData.FIELD_LEVEL);
+		Boolean ii = (Boolean) getCommandClassesData()
+				.getDataElemValue(CommandClassesData.FIELD_LEVEL);
 
 		if (ii != null)
 			return ii.booleanValue();
@@ -150,8 +150,8 @@ public class CommandClasses
 	 */
 	public double getVal()
 	{
-		Double ii = (Double) getCommandClassesData().getDataElemValue(
-				CommandClassesData.FIELD_VAL);
+		Double ii = (Double) getCommandClassesData()
+				.getDataElemValue(CommandClassesData.FIELD_VAL);
 
 		if (ii != null)
 			return ii.doubleValue();
@@ -166,8 +166,8 @@ public class CommandClasses
 	 */
 	public String getScale()
 	{
-		Object ii = getCommandClassesData().getDataElemValue(
-				CommandClassesData.FIELD_SCALE);
+		Object ii = getCommandClassesData()
+				.getDataElemValue(CommandClassesData.FIELD_SCALE);
 
 		if (ii != null)
 			return ii.toString();
@@ -177,8 +177,8 @@ public class CommandClasses
 
 	public long getValUpdateTime()
 	{
-		DataElemObject ii = getCommandClassesData().getDataElem(
-				CommandClassesData.FIELD_VAL);
+		DataElemObject ii = getCommandClassesData()
+				.getDataElem(CommandClassesData.FIELD_VAL);
 
 		if (ii != null)
 			return ii.getUpdateTime();
@@ -188,8 +188,8 @@ public class CommandClasses
 
 	public String getSensorType()
 	{
-		Object ii = getCommandClassesData().getDataElemValue(
-				CommandClassesData.FIELD_SENSORTYPE);
+		Object ii = getCommandClassesData()
+				.getDataElemValue(CommandClassesData.FIELD_SENSORTYPE);
 
 		if (ii != null)
 			return ii.toString();
@@ -202,18 +202,24 @@ public class CommandClasses
 	 */
 	public long getUpdateTime()
 	{
+		// invalid by default
+		long updateTime = DataConst.INVALID;
+
+		// get the update time
 		Long ii = (Long) getCommandClassesData().getUpdateTime();
 
+		//if an update time has been specified, return it
 		if (ii != null)
-			return ii.longValue();
-		else
-			return DataConst.INVALID;
+			updateTime = ii.longValue();
+
+		// return the update time
+		return updateTime;
 	}
 
 	public boolean isInterviewDone()
 	{
-		Boolean ii = (Boolean) getCommandClassesData().getDataElemValue(
-				CommandClassesData.FIELD_ISINTERVIEWDONE);
+		Boolean ii = (Boolean) getCommandClassesData()
+				.getDataElemValue(CommandClassesData.FIELD_ISINTERVIEWDONE);
 
 		if (ii != null)
 			return ii.booleanValue();

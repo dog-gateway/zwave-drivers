@@ -17,9 +17,11 @@
  */
 package it.polito.elite.dog.drivers.zwave.util;
 
+import it.polito.elite.dog.core.library.util.LogHelper;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.ZWaveModelTree;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
@@ -32,15 +34,16 @@ import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.osgi.framework.BundleContext;
+import org.osgi.service.log.LogService;
 
-public class ConnessionManager
+public class ConnectionManager
 {
 	// the log identifier, unique for the class
 	public static String LOG_ID = "[ZWaveConnessionManager]: ";
 
 	public static final String DATA_PATH = "/ZWaveAPI/Data";
 	public static final String RUN_PATH = "/ZWaveAPI/Run";
-	private static ConnessionManager connessionManager = null;
+	private static ConnectionManager connectionManager = null;
 
 	protected String sURL;
 
@@ -60,12 +63,42 @@ public class ConnessionManager
 	// last update
 	long lastUpdate = 0;
 
-	private ConnessionManager(String sURL, BundleContext bundleContext)
+	// the logger
+	LogHelper logger;
+
+	private ConnectionManager(String sURL, String sUser, String sPassword,
+			BundleContext bundleContext)
 	{
 		this.sURL = sURL;
+		this.logger = new LogHelper(bundleContext);
 
-		client = ClientBuilder.newBuilder().register(JacksonFeature.class)
-				.build();
+		// if credentials are specified, create an authenticated client,
+		// otherwise a simple one.
+		if ((sUser != null) && (!sUser.isEmpty()) && (sPassword != null)
+				&& (!sPassword.isEmpty()))
+		{
+			// create authenticated client
+			try
+			{
+				client = ClientBuilder.newBuilder()
+						.register(JacksonFeature.class)
+						.register(
+								new BasicAuthenticationFilter(sUser, sPassword))
+						.build();
+			}
+			catch (UnsupportedEncodingException e)
+			{
+				logger.log(LogService.LOG_ERROR,
+						"Unable to correctly set Basic authentication parameters",
+						e);
+			}
+		}
+		else
+		{
+			// create simple client
+			client = ClientBuilder.newBuilder().register(JacksonFeature.class)
+					.build();
+		}
 		service = client.target(sURL);
 	}
 
@@ -74,9 +107,9 @@ public class ConnessionManager
 	 * 
 	 * @return ConnessionManager, may be null
 	 */
-	public static ConnessionManager get()
+	public static ConnectionManager get()
 	{
-		return connessionManager;
+		return connectionManager;
 	}
 
 	/**
@@ -89,16 +122,17 @@ public class ConnessionManager
 	 * @param sPassword
 	 * @return ConnessionManager
 	 */
-	public static ConnessionManager get(String sURL, BundleContext bundleContext)
+	public static ConnectionManager get(String sURL, String sUser,
+			String sPassword, BundleContext bundleContext)
 	{
 		// create a new instance if needed, or returns the current one
-		if (connessionManager == null
-				|| !sURL.equals(connessionManager.getURL()))
+		if (connectionManager == null
+				|| !sURL.equals(connectionManager.getURL()))
 
-			connessionManager = new ConnessionManager(sURL,// sUser, sPassword,
+			connectionManager = new ConnectionManager(sURL, sUser, sPassword,
 					bundleContext);
 
-		return connessionManager;
+		return connectionManager;
 	}
 
 	/**
@@ -115,12 +149,10 @@ public class ConnessionManager
 	 */
 	public ZWaveModelTree updateDevices(long lSince) throws Exception
 	{
-		Response response = service.path(DATA_PATH)
-				.path(String.valueOf(lSince))
-				.request(MediaType.APPLICATION_JSON_TYPE)
-				.post(null); // post
-								// is
-								// mandatory
+		Response response = service.path(DATA_PATH).path(String.valueOf(lSince))
+				.request(MediaType.APPLICATION_JSON_TYPE).post(null); // post
+																		// is
+																		// mandatory
 
 		if (response.getStatus() == Status.OK.getStatusCode())
 		{
@@ -204,7 +236,7 @@ public class ConnessionManager
 		String jsonResponse = null;
 
 		Response response = service.path(RUN_PATH).path(sCommand)
-		//
+				//
 				.request(MediaType.APPLICATION_JSON_TYPE).post(null); // post
 
 		if (response.getStatus() == Status.OK.getStatusCode())

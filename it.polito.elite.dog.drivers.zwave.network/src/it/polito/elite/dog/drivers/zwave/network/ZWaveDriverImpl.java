@@ -26,7 +26,7 @@ import it.polito.elite.dog.drivers.zwave.model.zway.json.Instance;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.ZWaveModelTree;
 import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
-import it.polito.elite.dog.drivers.zwave.util.ConnessionManager;
+import it.polito.elite.dog.drivers.zwave.util.ConnectionManager;
 
 import java.util.Dictionary;
 import java.util.HashSet;
@@ -44,6 +44,18 @@ import org.osgi.service.log.LogService;
 
 public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 {
+	// -------------- The configuration parameters --------------
+
+	// the update time millis configuration parameter
+	public static String POLLING_TIME_MILLIS_CONFIG = "pollingTimeMillis";
+
+	// the username configuration
+	public static String USER_CONFIG = "username";
+
+	// the password config
+	public static String PWD_CONFIG = "password";
+
+	// ----------------------------------------------------------
 	// the log identifier, unique for the class
 	public static String LOG_ID = "[ZWaveDriverImpl]: ";
 
@@ -57,7 +69,7 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 	private LogHelper logger;
 
 	// connession maanger used to deal with zway server
-	private ConnessionManager conManager;
+	private ConnectionManager conManager;
 
 	// model tree representing the system
 	private ZWaveModelTree modelTree;
@@ -96,7 +108,7 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 
 			// try to get the baseline polling time
 			String pollingTimeAsString = (String) properties
-					.get("pollingTimeMillis");
+					.get(ZWaveDriverImpl.POLLING_TIME_MILLIS_CONFIG);
 
 			// trim leading and trailing spaces
 			pollingTimeAsString = pollingTimeAsString.trim();
@@ -108,8 +120,24 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 				pollingTimeMillis = Integer.valueOf(pollingTimeAsString);
 			}
 
+			// try to get the username
+			String username = (String) properties
+					.get(ZWaveDriverImpl.USER_CONFIG);
+
+			// trim leading and trailing spaces
+			if (username != null)
+				username = username.trim();
+
+			// try to get the username
+			String password = (String) properties
+					.get(ZWaveDriverImpl.PWD_CONFIG);
+
+			// trim leading and trailing spaces
+			if (password != null)
+				password = password.trim();
+
 			// Get the connession manager and try to connect to the server
-			conManager = ConnessionManager.get(sUrl, // sUsername, sPassword,
+			conManager = ConnectionManager.get(sUrl, username, password,
 					bundleContext);
 
 			// in any case, as the polling time has a default, init the poller
@@ -187,10 +215,10 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 				if (nodeInfo.isController())
 					controllerNode = modelTree.getController();
 
-				deviceNode = modelTree.getDevices().get(
-						nodeInfo.getDeviceNodeId());
-				Device device = modelTree.getDevices().get(
-						nodeInfo.getDeviceNodeId());
+				deviceNode = modelTree.getDevices()
+						.get(nodeInfo.getDeviceNodeId());
+				Device device = modelTree.getDevices()
+						.get(nodeInfo.getDeviceNodeId());
 				// device can be null if house xml configuration is wrong
 				if (device != null)
 				{
@@ -204,13 +232,12 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 						{
 							ZWaveDriverInstance driver = nodeInfo2Driver
 									.get(nodeInfo);
-							driver.newMessageFromHouse(deviceNode,
-									instanceNode, controllerNode, null);
+							driver.newMessageFromHouse(deviceNode, instanceNode,
+									controllerNode, null);
 						}
 						else
 						{
-							logger.log(
-									LogService.LOG_ERROR,
+							logger.log(LogService.LOG_ERROR,
 									LOG_ID + "Device id: "
 											+ nodeInfo.getDeviceNodeId()
 											+ " instance id: " + instanceId
@@ -246,12 +273,13 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 				// if version still not available
 				if (this.version == null)
 				{
-					String versionAsString = (String) this.modelTree.getController()
-							.getData().getAllData()
+					String versionAsString = (String) this.modelTree
+							.getController().getData().getAllData()
 							.get("softwareRevisionVersion").getValue();
 					versionAsString = versionAsString.trim().substring(1);
 					this.version = new Version(versionAsString);
-					logger.log(LogService.LOG_INFO, "ZWay version:" + this.version);
+					logger.log(LogService.LOG_INFO,
+							"ZWay version:" + this.version);
 				}
 
 				for (Set<ZWaveNodeInfo> nodeInfos : driver2NodeInfo.values())
@@ -290,8 +318,8 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 						// cases device removal at the z-wave network-level may
 						// happen before than the time in which the gateway
 						// driver detects it.
-						if (modelTree.getDevices().containsKey(
-								nodeInfo.getDeviceNodeId()))
+						if (modelTree.getDevices()
+								.containsKey(nodeInfo.getDeviceNodeId()))
 						{
 							conManager.sendCommand("devices["
 									+ nodeInfo.getDeviceNodeId()
@@ -302,8 +330,8 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 					}
 					catch (Exception e)
 					{
-						logger.log(LogService.LOG_ERROR, LOG_ID
-								+ "Can't send command", e);
+						logger.log(LogService.LOG_ERROR,
+								LOG_ID + "Can't send command", e);
 
 					}
 				}
@@ -425,12 +453,12 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 	{
 		try
 		{
-			//version > 1.3.1 patch
-			if(this.version.compareTo(new Version("1.3.1")) > 0)
+			// version > 1.3.1 patch
+			if (this.version.compareTo(new Version("1.3.1")) > 0)
 			{
-				if(nCommandClass == ZWaveAPI.GENERIC_TYPE_SWITCH_BINARY)
+				if (nCommandClass == ZWaveAPI.GENERIC_TYPE_SWITCH_BINARY)
 				{
-					if(commandValue.equals("255"))
+					if (commandValue.equals("255"))
 						commandValue = "true";
 					else
 						commandValue = "false";
