@@ -41,7 +41,7 @@ import org.osgi.service.log.LogService;
 public class ZWavePoller extends Thread
 {
 	// reference to the ZWaveDriverImpl currently using this poller
-	private ZWaveDriverImpl driver;
+	private ZWaveNetworkHandlerImpl driver;
 
 	// the runnable flag
 	private boolean runnable = true;
@@ -56,10 +56,10 @@ public class ZWavePoller extends Thread
 	public Set<TriggerElem> deviceSet = Collections.newSetFromMap(new ConcurrentHashMap<TriggerElem, Boolean>());
 	//public ConcurrentHashMap<Integer,TriggerElem> deviceSet = new ConcurrentHashMap<Integer,TriggerElem>();
 
-	public ZWavePoller(ZWaveDriverImpl zwaveDriveImpl)
+	public ZWavePoller(ZWaveNetworkHandlerImpl zWaveNetworkHandler)
 	{		
 		// store a reference to the poller driver
-		this.driver = zwaveDriveImpl;
+		this.driver = zWaveNetworkHandler;
 
 		// init the logger
 		this.logger = this.driver.getLogger();

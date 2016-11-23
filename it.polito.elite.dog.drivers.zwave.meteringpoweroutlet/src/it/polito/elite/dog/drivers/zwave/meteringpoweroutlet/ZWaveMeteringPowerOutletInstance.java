@@ -32,6 +32,7 @@ import it.polito.elite.dog.core.library.model.statevalue.ActiveEnergyStateValue;
 import it.polito.elite.dog.core.library.model.statevalue.ActivePowerStateValue;
 import it.polito.elite.dog.core.library.model.statevalue.OffStateValue;
 import it.polito.elite.dog.core.library.model.statevalue.OnStateValue;
+import it.polito.elite.dog.core.library.model.statevalue.StateValue;
 import it.polito.elite.dog.core.library.util.LogHelper;
 import it.polito.elite.dog.drivers.zwave.ZWaveAPI;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.CommandClasses;
@@ -42,6 +43,7 @@ import it.polito.elite.dog.drivers.zwave.model.zway.json.Instance;
 import it.polito.elite.dog.drivers.zwave.network.ZWaveDriverInstance;
 import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
+import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -72,10 +74,11 @@ public class ZWaveMeteringPowerOutletInstance extends ZWaveDriverInstance
 
 	public ZWaveMeteringPowerOutletInstance(ZWaveNetwork network,
 			ControllableDevice device, int deviceId, Set<Integer> instancesId,
-			int gatewayNodeId, int updateTimeMillis, BundleContext context)
+			String gatewayEndpoint, int gatewayNodeId, int updateTimeMillis,
+			BundleContext context)
 	{
-		super(network, device, deviceId, instancesId, gatewayNodeId,
-				updateTimeMillis, context);
+		super(network, device, deviceId, instancesId, gatewayEndpoint,
+				gatewayNodeId, updateTimeMillis, context);
 
 		// build inner data structures
 		this.groups = new HashSet<Integer>();
@@ -109,26 +112,29 @@ public class ZWaveMeteringPowerOutletInstance extends ZWaveDriverInstance
 
 		// initialize the energy state value
 		ActiveEnergyStateValue energyStateValue = new ActiveEnergyStateValue();
-		energyStateValue.setValue(DecimalMeasure.valueOf("0.0 "
-				+ SI.KILO(SI.WATT.times(NonSI.HOUR)).toString()));
+		energyStateValue.setValue(DecimalMeasure.valueOf(
+				"0.0 " + SI.KILO(SI.WATT.times(NonSI.HOUR)).toString()));
 		this.currentState.setState(
 				SinglePhaseActiveEnergyState.class.getSimpleName(),
-				new SinglePhaseActiveEnergyState(energyStateValue));
+				new SinglePhaseActiveEnergyState(
+						new StateValue[] { energyStateValue }));
 
 		// initialize the power state value
 		ActivePowerStateValue powerStateValue = new ActivePowerStateValue();
-		powerStateValue.setValue(DecimalMeasure.valueOf("0.0 "
-				+ SI.WATT.toString()));
+		powerStateValue
+				.setValue(DecimalMeasure.valueOf("0.0 " + SI.WATT.toString()));
 		this.currentState.setState(
 				SinglePhaseActivePowerMeasurementState.class.getSimpleName(),
-				new SinglePhaseActivePowerMeasurementState(powerStateValue));
+				new SinglePhaseActivePowerMeasurementState(
+						new StateValue[] { powerStateValue }));
 
 		// get the initial state of the device
 		Runnable worker = new Runnable()
 		{
 			public void run()
 			{
-				network.read(nodeInfo, true);
+				if (handler != null)
+					handler.read(nodeInfo, true);
 			}
 		};
 
@@ -255,9 +261,9 @@ public class ZWaveMeteringPowerOutletInstance extends ZWaveDriverInstance
 				DataElemObject energyEntry = ccElectricityEntry.get("0");
 				if (energyEntry != null)
 				{
-					this.changeActiveEnergyState(Double.valueOf(energyEntry
-							.getDataElemValue("val").toString()));
-					
+					this.changeActiveEnergyState(Double.valueOf(
+							energyEntry.getDataElemValue("val").toString()));
+
 					energyUpdated = true;
 
 				}
@@ -266,9 +272,9 @@ public class ZWaveMeteringPowerOutletInstance extends ZWaveDriverInstance
 				DataElemObject powerEntry = ccElectricityEntry.get("2");
 				if (powerEntry != null)
 				{
-					this.changeActivePowerState(Double.valueOf(powerEntry
-							.getDataElemValue("val").toString()));
-					
+					this.changeActivePowerState(Double.valueOf(
+							powerEntry.getDataElemValue("val").toString()));
+
 					powerUpdated = true;
 
 				}
@@ -276,16 +282,15 @@ public class ZWaveMeteringPowerOutletInstance extends ZWaveDriverInstance
 
 			// always update on-off state
 			int nLevel = 0;
-			CommandClasses ccEntryOnOff = instanceNode.getCommandClasses().get(
-					ZWaveAPI.COMMAND_CLASS_SWITCH_BINARY);
+			CommandClasses ccEntryOnOff = instanceNode.getCommandClasses()
+					.get(ZWaveAPI.COMMAND_CLASS_SWITCH_BINARY);
 
 			if (ccEntryOnOff != null)
 				nLevel = ccEntryOnOff.getLevelAsInt();
 
 			// update the on/off state
-			boolean onoffChanged = this
-					.changeOnOffState((nLevel > 0) ? OnOffState.ON
-							: OnOffState.OFF);
+			boolean onoffChanged = this.changeOnOffState(
+					(nLevel > 0) ? OnOffState.ON : OnOffState.OFF);
 
 			if (onoffChanged || energyUpdated || powerUpdated)
 				this.updateStatus();
@@ -306,11 +311,9 @@ public class ZWaveMeteringPowerOutletInstance extends ZWaveDriverInstance
 				+ SI.KILO(SI.WATT.times(NonSI.HOUR)).toString());
 
 		// update the state
-		ActiveEnergyStateValue pValue = new ActiveEnergyStateValue();
-		pValue.setValue(value);
-		currentState.setState(
-				SinglePhaseActiveEnergyState.class.getSimpleName(),
-				new SinglePhaseActiveEnergyState(pValue));
+		this.currentState
+				.getState(SinglePhaseActiveEnergyState.class.getSimpleName())
+				.getCurrentStateValue()[0].setValue(value);
 
 		// debug
 		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
@@ -331,15 +334,13 @@ public class ZWaveMeteringPowerOutletInstance extends ZWaveDriverInstance
 	private void changeActivePowerState(double activePower)
 	{
 		// build the power measure
-		DecimalMeasure<?> powerValue = DecimalMeasure.valueOf(activePower + " "
-				+ SI.WATT.toString());
+		DecimalMeasure<?> powerValue = DecimalMeasure
+				.valueOf(activePower + " " + SI.WATT.toString());
 
 		// update the state
-		ActivePowerStateValue pValue = new ActivePowerStateValue();
-		pValue.setValue(powerValue);
-		currentState.setState(
-				SinglePhaseActivePowerMeasurementState.class.getSimpleName(),
-				new SinglePhaseActivePowerMeasurementState(pValue));
+		this.currentState.getState(
+				SinglePhaseActivePowerMeasurementState.class.getSimpleName())
+				.getCurrentStateValue()[0].setValue(powerValue);
 
 		// debug
 		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
@@ -408,9 +409,9 @@ public class ZWaveMeteringPowerOutletInstance extends ZWaveDriverInstance
 	}
 
 	@Override
-	protected void addToNetworkDriver(ZWaveNodeInfo nodeInfo)
+	protected ZWaveNetworkHandler addToNetworkDriver(ZWaveNodeInfo nodeInfo)
 	{
-		network.addDriver(nodeInfo, updateTimeMillis, this);
+		return network.addDriver(nodeInfo, updateTimeMillis, this);
 	}
 
 	@Override
@@ -424,8 +425,9 @@ public class ZWaveMeteringPowerOutletInstance extends ZWaveDriverInstance
 	{
 		// Sends on command to all instances, probably only one in this case
 		for (Integer instanceId : nodeInfo.getInstanceSet())
-			network.write(nodeInfo.getDeviceNodeId(), instanceId,
-					ZWaveAPI.COMMAND_CLASS_SWITCH_BINARY, "255");
+			if (this.handler != null)
+				this.handler.write(nodeInfo.getDeviceNodeId(), instanceId,
+						ZWaveAPI.COMMAND_CLASS_SWITCH_BINARY, "255");
 	}
 
 	@Override
@@ -433,15 +435,16 @@ public class ZWaveMeteringPowerOutletInstance extends ZWaveDriverInstance
 	{
 		// Sends off command to all instances, probably only one in this case
 		for (Integer instanceId : nodeInfo.getInstanceSet())
-			network.write(nodeInfo.getDeviceNodeId(), instanceId,
-					ZWaveAPI.COMMAND_CLASS_SWITCH_BINARY, "0");
+			if (this.handler != null)
+				this.handler.write(nodeInfo.getDeviceNodeId(), instanceId,
+						ZWaveAPI.COMMAND_CLASS_SWITCH_BINARY, "0");
 	}
 
 	@Override
 	public Measure<?, ?> getActiveEnergyValue()
 	{
-		return (Measure<?, ?>) currentState.getState(
-				SinglePhaseActiveEnergyState.class.getSimpleName())
+		return (Measure<?, ?>) currentState
+				.getState(SinglePhaseActiveEnergyState.class.getSimpleName())
 				.getCurrentStateValue()[0].getValue();
 	}
 
@@ -485,8 +488,8 @@ public class ZWaveMeteringPowerOutletInstance extends ZWaveDriverInstance
 		{
 			instanceCommand.put(instanceId, ccSet);
 		}
-		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(deviceId, instanceCommand,
-				isController);
+		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(this.gatewayEndpoint,
+				deviceId, instanceCommand, isController);
 
 		return nodeInfo;
 	}

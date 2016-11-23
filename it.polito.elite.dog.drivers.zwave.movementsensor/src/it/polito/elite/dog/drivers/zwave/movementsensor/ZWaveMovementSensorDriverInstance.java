@@ -34,6 +34,7 @@ import it.polito.elite.dog.drivers.zwave.model.zway.json.Instance;
 import it.polito.elite.dog.drivers.zwave.network.ZWaveDriverInstance;
 import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
+import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -50,10 +51,11 @@ public class ZWaveMovementSensorDriverInstance extends ZWaveDriverInstance
 
 	public ZWaveMovementSensorDriverInstance(ZWaveNetwork network,
 			ControllableDevice device, int deviceId, Set<Integer> instancesId,
-			int gatewayNodeId, int updateTimeMillis, BundleContext context)
+			String gatewayEndpoint, int gatewayNodeId, int updateTimeMillis,
+			BundleContext context)
 	{
-		super(network, device, deviceId, instancesId, gatewayNodeId,
-				updateTimeMillis, context);
+		super(network, device, deviceId, instancesId, gatewayEndpoint,
+				gatewayNodeId, updateTimeMillis, context);
 
 		// create a logger
 		logger = new LogHelper(context);
@@ -76,7 +78,8 @@ public class ZWaveMovementSensorDriverInstance extends ZWaveDriverInstance
 		{
 			public void run()
 			{
-				network.read(nodeInfo, true);
+				if (handler != null)
+					handler.read(nodeInfo, true);
 			}
 		};
 
@@ -98,8 +101,8 @@ public class ZWaveMovementSensorDriverInstance extends ZWaveDriverInstance
 		if (ccEntry != null)
 
 			// notify open/close only if changed
-			if (changeMovementState((ccEntry.getLevelAsBoolean() ? MovementState.ISMOVING
-					: MovementState.NOTMOVING)))
+			if (changeMovementState((ccEntry.getLevelAsBoolean()
+					? MovementState.ISMOVING : MovementState.NOTMOVING)))
 				// notify state changed
 				this.updateStatus();
 
@@ -169,9 +172,9 @@ public class ZWaveMovementSensorDriverInstance extends ZWaveDriverInstance
 	}
 
 	@Override
-	protected void addToNetworkDriver(ZWaveNodeInfo nodeInfo)
+	protected ZWaveNetworkHandler addToNetworkDriver(ZWaveNodeInfo nodeInfo)
 	{
-		network.addDriver(nodeInfo, updateTimeMillis, this);
+		return network.addDriver(nodeInfo, updateTimeMillis, this);
 	}
 
 	@Override
@@ -200,8 +203,8 @@ public class ZWaveMovementSensorDriverInstance extends ZWaveDriverInstance
 		{
 			instanceCommand.put(instanceId, ccSet);
 		}
-		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(deviceId, instanceCommand,
-				isController);
+		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(this.gatewayEndpoint,
+				deviceId, instanceCommand, isController);
 		return nodeInfo;
 	}
 

@@ -40,6 +40,7 @@ import it.polito.elite.dog.drivers.zwave.model.zway.json.Instance;
 import it.polito.elite.dog.drivers.zwave.network.ZWaveDriverInstance;
 import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
+import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
 import it.polito.elite.dog.drivers.zwave.persistence.JSONPersistenceManager;
 
 import java.io.File;
@@ -74,11 +75,11 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 
 	public ZWaveThermostaticRadiatorValveInstance(ZWaveNetwork network,
 			ControllableDevice device, int deviceId, Set<Integer> instancesId,
-			int gatewayNodeId, int updateTimeMillis,
+			String gatewayEndpoint, int gatewayNodeId, int updateTimeMillis,
 			String persistenceStoreDir, BundleContext context)
 	{
-		super(network, device, deviceId, instancesId, gatewayNodeId,
-				updateTimeMillis, context);
+		super(network, device, deviceId, instancesId, gatewayEndpoint,
+				gatewayNodeId, updateTimeMillis, context);
 
 		// create a logger
 		this.logger = new LogHelper(context);
@@ -110,10 +111,9 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 				this.persistentStore = null;
 
 				// warning
-				this.logger
-						.log(LogService.LOG_WARNING,
-								"Unable to create/acquire the persistent store for climate schedules, running in-memory only: all changes will be lost upon restart.",
-								e);
+				this.logger.log(LogService.LOG_WARNING,
+						"Unable to create/acquire the persistent store for climate schedules, running in-memory only: all changes will be lost upon restart.",
+						e);
 			}
 		}
 		else
@@ -122,9 +122,8 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 			this.persistentStore = null;
 
 			// warning
-			this.logger
-					.log(LogService.LOG_WARNING,
-							"Unable to find the persistent store for climate schedules, running in-memory only: all changes will be lost upon restart.");
+			this.logger.log(LogService.LOG_WARNING,
+					"Unable to find the persistent store for climate schedules, running in-memory only: all changes will be lost upon restart.");
 		}
 
 		// initialize states
@@ -220,8 +219,8 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 
 		// get the current state value registered as values of the climate
 		// schedule state
-		StateValue[] states = this.currentState.getState(
-				ClimateScheduleState.class.getSimpleName())
+		StateValue[] states = this.currentState
+				.getState(ClimateScheduleState.class.getSimpleName())
 				.getCurrentStateValue();
 
 		// look for the state value associated to the given weekday
@@ -252,9 +251,10 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 	{
 		// update the mode
 		for (Integer instanceId : nodeInfo.getInstanceSet())
-			network.write(nodeInfo.getDeviceNodeId(), instanceId,
-					ZWaveAPI.COMMAND_CLASS_THERMOSTAT_MODE, ""
-							+ ThermostatMode.MODE_COOL);
+			if (this.handler != null)
+				this.handler.write(nodeInfo.getDeviceNodeId(), instanceId,
+						ZWaveAPI.COMMAND_CLASS_THERMOSTAT_MODE,
+						"" + ThermostatMode.MODE_COOL);
 
 		// notify
 		this.notifyCool();
@@ -266,9 +266,10 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 	{
 		// updated the mode
 		for (Integer instanceId : nodeInfo.getInstanceSet())
-			network.write(nodeInfo.getDeviceNodeId(), instanceId,
-					ZWaveAPI.COMMAND_CLASS_THERMOSTAT_MODE, ""
-							+ ThermostatMode.MODE_OFF);
+			if (this.handler != null)
+				this.handler.write(nodeInfo.getDeviceNodeId(), instanceId,
+						ZWaveAPI.COMMAND_CLASS_THERMOSTAT_MODE,
+						"" + ThermostatMode.MODE_OFF);
 
 		// notify
 		this.notifyStoppedHeatingOrCooling();
@@ -281,9 +282,10 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 		// get the value in celsius
 		String celsius = String.format("%02.02f", temperature.getValue());
 		for (Integer instanceId : nodeInfo.getInstanceSet())
-			network.write(nodeInfo.getDeviceNodeId(), instanceId,
-					ZWaveAPI.COMMAND_CLASS_THERMOSTAT_SETPOINT,
-					ThermostatMode.MODE_HEAT + "," + celsius);
+			if (this.handler != null)
+				this.handler.write(nodeInfo.getDeviceNodeId(), instanceId,
+						ZWaveAPI.COMMAND_CLASS_THERMOSTAT_SETPOINT,
+						ThermostatMode.MODE_HEAT + "," + celsius);
 	}
 
 	@Override
@@ -295,9 +297,10 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 
 		// updated the setPoint
 		for (Integer instanceId : nodeInfo.getInstanceSet())
-			network.write(nodeInfo.getDeviceNodeId(), instanceId,
-					ZWaveAPI.COMMAND_CLASS_THERMOSTAT_MODE, ""
-							+ ThermostatMode.MODE_HEAT);
+			if (this.handler != null)
+				this.handler.write(nodeInfo.getDeviceNodeId(), instanceId,
+						ZWaveAPI.COMMAND_CLASS_THERMOSTAT_MODE,
+						"" + ThermostatMode.MODE_HEAT);
 
 		// notify
 		this.notifyHeat();
@@ -321,8 +324,8 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 			this.deviceNode = deviceNode;
 
 			// get the thermostat set point command class data
-			CommandClasses thermostatCC = instanceNode
-					.getCommandClass(ZWaveAPI.COMMAND_CLASS_THERMOSTAT_SETPOINT);
+			CommandClasses thermostatCC = instanceNode.getCommandClass(
+					ZWaveAPI.COMMAND_CLASS_THERMOSTAT_SETPOINT);
 
 			// get the last update time if any (from the set point)
 			DataElemObject setPointElem = thermostatCC.getCommandClassesData()
@@ -341,13 +344,11 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 					// read the current set point
 					double setPoint = ((Number) setPointElem
 							.getDataElemValue(CommandClassesData.FIELD_VAL))
-							.doubleValue();
+									.doubleValue();
 
 					// read the current unit of measure
 					String unitOfMeasure = (String) thermostatCC
-							.getCommandClassesData()
-							.getAllData()
-							.get("1")
+							.getCommandClassesData().getAllData().get("1")
 							.getDataElemValue(
 									CommandClassesData.FIELD_SCALESTRING);
 
@@ -370,7 +371,8 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 							setPointState);
 
 					// notify the temperature change
-					this.notifyChangedDesiredTemperatureSetting(setPointTemperature);
+					this.notifyChangedDesiredTemperatureSetting(
+							setPointTemperature);
 
 					// notify the new state
 					this.updateStatus();
@@ -397,9 +399,9 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 	}
 
 	@Override
-	protected void addToNetworkDriver(ZWaveNodeInfo nodeInfo)
+	protected ZWaveNetworkHandler addToNetworkDriver(ZWaveNodeInfo nodeInfo)
 	{
-		network.addDriver(nodeInfo, updateTimeMillis, this);
+		return network.addDriver(nodeInfo, updateTimeMillis, this);
 	}
 
 	@Override
@@ -424,8 +426,8 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 			instanceCommand.put(instanceId, ccSet);
 		}
 
-		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(deviceId, instanceCommand,
-				isController);
+		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(this.gatewayEndpoint,
+				deviceId, instanceCommand, isController);
 
 		return nodeInfo;
 	}
@@ -485,7 +487,8 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 						new TemperatureState(new TemperatureStateValue()));
 
 				// read the current state
-				network.read(nodeInfo, true);
+				if (handler != null)
+					handler.read(nodeInfo, true);
 
 				// set the is ready flag at true
 				isReady = true;
@@ -526,8 +529,8 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 
 					// set the new set point if available
 					if (switchPoint != null)
-						this.setTemperatureAt(switchPoint
-								.desiredTemperatureAsMeasure());
+						this.setTemperatureAt(
+								switchPoint.desiredTemperatureAsMeasure());
 
 					// break as no more switch points can be activated for this
 					// instant of time
@@ -584,9 +587,9 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 	@Override
 	public Measure<?, ?> getSetpointTemperature()
 	{
-		return (Measure<?, ?>) this.currentState.getState(
-				TemperatureState.class.getSimpleName()).getCurrentStateValue()[0]
-				.getValue();
+		return (Measure<?, ?>) this.currentState
+				.getState(TemperatureState.class.getSimpleName())
+				.getCurrentStateValue()[0].getValue();
 	}
 
 }

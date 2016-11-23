@@ -30,7 +30,8 @@ import org.osgi.framework.BundleContext;
 import org.osgi.service.cm.ConfigurationException;
 import org.osgi.service.log.LogService;
 
-public class ZWavePowerMeteringLevelControllableOutputDriver extends ZWaveDeviceDriver
+public class ZWavePowerMeteringLevelControllableOutputDriver
+		extends ZWaveDeviceDriver
 {
 	// the step entity in percentage
 	protected int stepPercentage;
@@ -44,23 +45,25 @@ public class ZWavePowerMeteringLevelControllableOutputDriver extends ZWaveDevice
 	@Override
 	public ZWaveDriverInstance createZWaveDriverInstance(
 			ZWaveNetwork zWaveNetwork, ControllableDevice device, int nodeId,
-			HashSet<Integer> instancesId, int gatewayNodeId,
-			int updateTimeMillis, BundleContext context)
+			HashSet<Integer> instancesId, String gatewayEndpoint,
+			int gatewayNodeId, int updateTimeMillis, BundleContext context)
 	{
 
-		return new ZWavePowerMeteringLevelControllableOutputDriverInstance(zWaveNetwork, device,
-				nodeId, instancesId, gatewayNodeId, updateTimeMillis,
-				stepPercentage, context);
+		return new ZWavePowerMeteringLevelControllableOutputDriverInstance(
+				zWaveNetwork, device, nodeId, instancesId, gatewayEndpoint,
+				gatewayNodeId, updateTimeMillis, stepPercentage, context);
 	}
-	
+
 	@Override
-	public void updated(Dictionary<String, ?> properties) throws ConfigurationException
+	public void updated(Dictionary<String, ?> properties)
+			throws ConfigurationException
 	{
 		if (properties != null)
-		{			
+		{
 			// try to get the step entity
-			String stepEntityAsString = (String) properties.get(ZWaveInfo.PROPERTY_STEP_PERCENT);
-			
+			String stepEntityAsString = (String) properties
+					.get(ZWaveInfo.PROPERTY_STEP_PERCENT);
+
 			// check not null
 			if (stepEntityAsString != null)
 			{
@@ -71,11 +74,13 @@ public class ZWavePowerMeteringLevelControllableOutputDriver extends ZWaveDevice
 			}
 			else
 			{
-				this.logger.log(LogService.LOG_WARNING, ZWaveInfo.PROPERTY_STEP_PERCENT
-						+ " not defined in configuraton file for "
-						+ ZWavePowerMeteringLevelControllableOutputDriver.class.getName());
+				this.logger.log(LogService.LOG_WARNING,
+						ZWaveInfo.PROPERTY_STEP_PERCENT
+								+ " not defined in configuraton file for "
+								+ ZWavePowerMeteringLevelControllableOutputDriver.class
+										.getName());
 			}
-			
+
 			// call the normal updated method
 			super.updated(properties);
 		}

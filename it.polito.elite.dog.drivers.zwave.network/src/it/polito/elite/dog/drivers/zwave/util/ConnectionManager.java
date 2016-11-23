@@ -17,9 +17,6 @@
  */
 package it.polito.elite.dog.drivers.zwave.util;
 
-import it.polito.elite.dog.core.library.util.LogHelper;
-import it.polito.elite.dog.drivers.zwave.model.zway.json.ZWaveModelTree;
-
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 
@@ -33,8 +30,10 @@ import javax.ws.rs.core.Response.Status;
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.glassfish.jersey.jackson.JacksonFeature;
-import org.osgi.framework.BundleContext;
 import org.osgi.service.log.LogService;
+
+import it.polito.elite.dog.core.library.util.LogHelper;
+import it.polito.elite.dog.drivers.zwave.model.zway.json.ZWaveModelTree;
 
 public class ConnectionManager
 {
@@ -66,11 +65,11 @@ public class ConnectionManager
 	// the logger
 	LogHelper logger;
 
-	private ConnectionManager(String sURL, String sUser, String sPassword,
-			BundleContext bundleContext)
+	public ConnectionManager(String sURL, String sUser, String sPassword,
+			LogHelper logger)
 	{
 		this.sURL = sURL;
-		this.logger = new LogHelper(bundleContext);
+		this.logger = logger;
 
 		// if credentials are specified, create an authenticated client,
 		// otherwise a simple one.
@@ -101,6 +100,11 @@ public class ConnectionManager
 		}
 		service = client.target(sURL);
 	}
+	
+	/*------ SINGLETON -------*/
+	
+	//inherited from the previous single-gateway implementation
+	//needs to be revised and possibly deleted if not needed.
 
 	/**
 	 * Obtain the current ConnessionManager
@@ -123,17 +127,19 @@ public class ConnectionManager
 	 * @return ConnessionManager
 	 */
 	public static ConnectionManager get(String sURL, String sUser,
-			String sPassword, BundleContext bundleContext)
+			String sPassword, LogHelper logger)
 	{
 		// create a new instance if needed, or returns the current one
 		if (connectionManager == null
 				|| !sURL.equals(connectionManager.getURL()))
 
 			connectionManager = new ConnectionManager(sURL, sUser, sPassword,
-					bundleContext);
+					logger);
 
 		return connectionManager;
 	}
+	
+	/*----- END SINGLETON ------*/
 
 	/**
 	 * Query zway-server for an update of the system status since the lSince

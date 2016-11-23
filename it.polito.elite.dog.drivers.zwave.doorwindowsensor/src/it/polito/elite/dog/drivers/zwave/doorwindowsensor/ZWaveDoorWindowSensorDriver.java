@@ -41,10 +41,10 @@ public class ZWaveDoorWindowSensorDriver extends ZWaveDeviceDriver
 	@Override
 	public ZWaveDriverInstance createZWaveDriverInstance(
 			ZWaveNetwork zWaveNetwork, ControllableDevice device, int nodeId,
-			HashSet<Integer> instancesId, int gatewayNodeId,
+			HashSet<Integer> instancesId, String gatewayEndpoint, int gatewayNodeId,
 			int updateTimeMillis, BundleContext context)
 	{
 		return new ZWaveDoorWindowSensorDriverInstance(zWaveNetwork, device,
-				nodeId, instancesId, gatewayNodeId, updateTimeMillis, context);
+				nodeId, instancesId, gatewayEndpoint, gatewayNodeId, updateTimeMillis, context);
 	}
 }

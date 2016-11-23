@@ -38,12 +38,13 @@ import org.osgi.service.event.EventHandler;
  * @author bonino
  * 
  */
-public class ZWaveThermostaticRadiatorValveDriver extends ZWaveDeviceDriver implements EventHandler
+public class ZWaveThermostaticRadiatorValveDriver extends ZWaveDeviceDriver
+		implements EventHandler
 {
 
 	// the persistence store associated to this driver
 	private String persistenceStoreDirectory;
-		
+
 	/**
 	 * 
 	 */
@@ -56,10 +57,12 @@ public class ZWaveThermostaticRadiatorValveDriver extends ZWaveDeviceDriver impl
 	@Override
 	public ZWaveDriverInstance createZWaveDriverInstance(
 			ZWaveNetwork zWaveNetwork, ControllableDevice device, int nodeId,
-			HashSet<Integer> instancesId, int gatewayNodeId,
-			int updateTimeMillis, BundleContext context)
+			HashSet<Integer> instancesId, String gatewayEndpoint,
+			int gatewayNodeId, int updateTimeMillis, BundleContext context)
 	{
-		return new ZWaveThermostaticRadiatorValveInstance(zWaveNetwork, device, nodeId, instancesId, gatewayNodeId, updateTimeMillis, this.persistenceStoreDirectory, context);
+		return new ZWaveThermostaticRadiatorValveInstance(zWaveNetwork, device,
+				nodeId, instancesId, gatewayEndpoint, gatewayNodeId,
+				updateTimeMillis, this.persistenceStoreDirectory, context);
 	}
 
 	@Override
@@ -86,8 +89,7 @@ public class ZWaveThermostaticRadiatorValveDriver extends ZWaveDeviceDriver impl
 						this.persistenceStoreDirectory);
 				if (!persistenceStoreDir.isAbsolute())
 					this.persistenceStoreDirectory = System
-							.getProperty("configFolder")
-							+ "/"
+							.getProperty("configFolder") + "/"
 							+ this.persistenceStoreDirectory;
 			}
 
@@ -114,11 +116,13 @@ public class ZWaveThermostaticRadiatorValveDriver extends ZWaveDeviceDriver impl
 					synchronized (managedInstances)
 					{
 						// dispatch the event content
-						for (ZWaveDriverInstance driverInstance : managedInstances.values())
+						for (ZWaveDriverInstance driverInstance : managedInstances
+								.values())
 						{
-							((ZWaveThermostaticRadiatorValveInstance)driverInstance)
-									.checkTime(((ClockTimeNotification) eventContent)
-											.getClockTick());
+							((ZWaveThermostaticRadiatorValveInstance) driverInstance)
+									.checkTime(
+											((ClockTimeNotification) eventContent)
+													.getClockTick());
 						}
 					}
 
@@ -134,7 +138,5 @@ public class ZWaveThermostaticRadiatorValveDriver extends ZWaveDeviceDriver impl
 		}
 
 	}
-
-
 
 }

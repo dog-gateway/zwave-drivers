@@ -27,3 +27,4 @@ Export-Package: it.polito.elite.dog.drivers.zwave.device,
  it.polito.elite.dog.drivers.zwave.gateway
 Bundle-ClassPath: deviceTemplates/,
  .
+Bundle-ActivationPolicy: lazy

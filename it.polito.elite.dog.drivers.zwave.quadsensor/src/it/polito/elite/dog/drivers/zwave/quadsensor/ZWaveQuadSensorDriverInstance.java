@@ -43,6 +43,7 @@ import it.polito.elite.dog.drivers.zwave.model.zway.json.Instance;
 import it.polito.elite.dog.drivers.zwave.network.ZWaveDriverInstance;
 import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
+import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -76,10 +77,11 @@ public class ZWaveQuadSensorDriverInstance extends ZWaveDriverInstance
 
 	public ZWaveQuadSensorDriverInstance(ZWaveNetwork network,
 			ControllableDevice device, int deviceId, Set<Integer> instancesId,
-			int gatewayNodeId, int updateTimeMillis, BundleContext context)
+			String gatewayEndpoint, int gatewayNodeId, int updateTimeMillis,
+			BundleContext context)
 	{
-		super(network, device, deviceId, instancesId, gatewayNodeId,
-				updateTimeMillis, context);
+		super(network, device, deviceId, instancesId, gatewayEndpoint,
+				gatewayNodeId, updateTimeMillis, context);
 
 		// build inner data structures
 		this.groups = new HashSet<Integer>();
@@ -119,7 +121,8 @@ public class ZWaveQuadSensorDriverInstance extends ZWaveDriverInstance
 		{
 			public void run()
 			{
-				network.read(nodeInfo, true);
+				if (handler != null)
+					handler.read(nodeInfo, true);
 			}
 		};
 
@@ -133,7 +136,7 @@ public class ZWaveQuadSensorDriverInstance extends ZWaveDriverInstance
 	{
 		// update deviceNode
 		this.deviceNode = deviceNode;
-		
+
 		// the state change flags
 		boolean measureUpdated = false;
 		boolean movementUpdated = false;
@@ -164,8 +167,8 @@ public class ZWaveQuadSensorDriverInstance extends ZWaveDriverInstance
 						.getDataElemValue(CommandClassesData.FIELD_SCALESTRING);
 
 				// forward to the right method
-				measureUpdated = this.forwardMeasure(measure, unitOfMeasure, sensorType,
-						this.lastUpdateTime);
+				measureUpdated = this.forwardMeasure(measure, unitOfMeasure,
+						sensorType, this.lastUpdateTime);
 
 			}
 
@@ -201,16 +204,16 @@ public class ZWaveQuadSensorDriverInstance extends ZWaveDriverInstance
 							.toString());
 
 					// Read sensorType
-					String sensorType = (String) sensorData
-							.getDataElemValue(CommandClassesData.FIELD_SENSORTYPE);
+					String sensorType = (String) sensorData.getDataElemValue(
+							CommandClassesData.FIELD_SENSORTYPE);
 
 					// parse unit of measure
-					String unitOfMeasure = (String) sensorData
-							.getDataElemValue(CommandClassesData.FIELD_SCALESTRING);
+					String unitOfMeasure = (String) sensorData.getDataElemValue(
+							CommandClassesData.FIELD_SCALESTRING);
 
 					// forward to the right method
-					measureUpdated = this.forwardMeasure(measure, unitOfMeasure, sensorType,
-							updateTime);
+					measureUpdated = this.forwardMeasure(measure, unitOfMeasure,
+							sensorType, updateTime);
 
 				}
 				catch (NumberFormatException ne)
@@ -228,10 +231,10 @@ public class ZWaveQuadSensorDriverInstance extends ZWaveDriverInstance
 
 		if (ccEntry != null)
 			// notify open/close only if changed
-			movementUpdated = changeMovementState((ccEntry.getLevelAsBoolean() ? MovementState.ISMOVING
-					: MovementState.NOTMOVING));
+			movementUpdated = changeMovementState((ccEntry.getLevelAsBoolean()
+					? MovementState.ISMOVING : MovementState.NOTMOVING));
 
-		if(measureUpdated || movementUpdated)
+		if (measureUpdated || movementUpdated)
 			this.updateStatus();
 	}
 
@@ -294,10 +297,9 @@ public class ZWaveQuadSensorDriverInstance extends ZWaveDriverInstance
 	private void changeTemperatureState(double measure, String unitOfMeasure)
 	{
 		// build the temperature measure
-		DecimalMeasure<?> temperatureValue = DecimalMeasure.valueOf(measure
-				+ " "
-				+ (unitOfMeasure.contains("C") ? SI.CELSIUS.toString()
-						: NonSI.FAHRENHEIT.toString()));
+		DecimalMeasure<?> temperatureValue = DecimalMeasure
+				.valueOf(measure + " " + (unitOfMeasure.contains("C")
+						? SI.CELSIUS.toString() : NonSI.FAHRENHEIT.toString()));
 
 		// if the given temperature is null, than the network-level
 		// value is not up-to-date
@@ -320,8 +322,8 @@ public class ZWaveQuadSensorDriverInstance extends ZWaveDriverInstance
 	private void changeHumidityState(double measure, String unitOfMeasure)
 	{
 		// build the humidity measure
-		DecimalMeasure<?> relativeHumidity = DecimalMeasure.valueOf(measure
-				+ " " + unitOfMeasure);
+		DecimalMeasure<?> relativeHumidity = DecimalMeasure
+				.valueOf(measure + " " + unitOfMeasure);
 		// if the given temperature is null, than the network-level
 		// value is not up-to-date
 		if (relativeHumidity != null)
@@ -344,8 +346,8 @@ public class ZWaveQuadSensorDriverInstance extends ZWaveDriverInstance
 	private void changeLightIntensityState(double measure, String unitOfMeasure)
 	{
 		// build the luminosity value
-		DecimalMeasure<?> luminosityValue = DecimalMeasure.valueOf(measure
-				+ " " + unitOfMeasure);
+		DecimalMeasure<?> luminosityValue = DecimalMeasure
+				.valueOf(measure + " " + unitOfMeasure);
 
 		// if the given light intensity is null, than the network-level
 		// value is
@@ -376,9 +378,9 @@ public class ZWaveQuadSensorDriverInstance extends ZWaveDriverInstance
 	}
 
 	@Override
-	protected void addToNetworkDriver(ZWaveNodeInfo nodeInfo)
+	protected ZWaveNetworkHandler addToNetworkDriver(ZWaveNodeInfo nodeInfo)
 	{
-		network.addDriver(nodeInfo, updateTimeMillis, this);
+		return network.addDriver(nodeInfo, updateTimeMillis, this);
 	}
 
 	@Override
@@ -415,24 +417,24 @@ public class ZWaveQuadSensorDriverInstance extends ZWaveDriverInstance
 	@Override
 	public Measure<?, ?> getRelativeHumidity()
 	{
-		return (Measure<?, ?>) currentState.getState(
-				HumidityMeasurementState.class.getSimpleName())
+		return (Measure<?, ?>) currentState
+				.getState(HumidityMeasurementState.class.getSimpleName())
 				.getCurrentStateValue()[0].getValue();
 	}
 
 	@Override
 	public Measure<?, ?> getTemperature()
 	{
-		return (Measure<?, ?>) currentState.getState(
-				TemperatureState.class.getSimpleName()).getCurrentStateValue()[0]
-				.getValue();
+		return (Measure<?, ?>) currentState
+				.getState(TemperatureState.class.getSimpleName())
+				.getCurrentStateValue()[0].getValue();
 	}
 
 	@Override
 	public Measure<?, ?> getLuminance()
 	{
-		return (Measure<?, ?>) currentState.getState(
-				LightIntensityState.class.getSimpleName())
+		return (Measure<?, ?>) currentState
+				.getState(LightIntensityState.class.getSimpleName())
 				.getCurrentStateValue()[0].getValue();
 	}
 
@@ -508,8 +510,8 @@ public class ZWaveQuadSensorDriverInstance extends ZWaveDriverInstance
 		{
 			instanceCommand.put(instanceId, ccSet);
 		}
-		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(deviceId, instanceCommand,
-				isController);
+		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(this.gatewayEndpoint,
+				deviceId, instanceCommand, isController);
 
 		return nodeInfo;
 	}
@@ -518,7 +520,7 @@ public class ZWaveQuadSensorDriverInstance extends ZWaveDriverInstance
 			String sensorType, long updateTime)
 	{
 		boolean stateChanged = false;
-		
+
 		// check which value has been read
 		if (sensorType.equals(SensorType.SENSORTYPE_TEMPERATURE))
 		{
@@ -530,7 +532,7 @@ public class ZWaveQuadSensorDriverInstance extends ZWaveDriverInstance
 				// change the state
 				this.changeTemperatureState(measure, unitOfMeasure);
 
-				//changed
+				// changed
 				stateChanged = true;
 			}
 		}
@@ -542,8 +544,8 @@ public class ZWaveQuadSensorDriverInstance extends ZWaveDriverInstance
 				this.humidityUpdateTime = updateTime;
 
 				this.changeHumidityState(measure, unitOfMeasure);
-				
-				//changed
+
+				// changed
 				stateChanged = true;
 			}
 		}
@@ -553,14 +555,14 @@ public class ZWaveQuadSensorDriverInstance extends ZWaveDriverInstance
 			if (this.luminiscenceUpdateTime < updateTime)
 			{
 				this.luminiscenceUpdateTime = updateTime;
-				
+
 				this.changeLightIntensityState(measure, unitOfMeasure);
-				
-				//changed
+
+				// changed
 				stateChanged = true;
 			}
 		}
-		
+
 		return stateChanged;
 	}
 

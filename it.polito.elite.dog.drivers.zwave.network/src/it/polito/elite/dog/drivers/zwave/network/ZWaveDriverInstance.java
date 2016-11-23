@@ -28,6 +28,7 @@ import it.polito.elite.dog.drivers.zwave.model.zway.json.Instance;
 import it.polito.elite.dog.drivers.zwave.network.info.ZWaveInfo;
 import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
+import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
 
 import java.util.HashSet;
 import java.util.Map;
@@ -40,7 +41,13 @@ public abstract class ZWaveDriverInstance implements StatefulDevice
 {
 	// a reference to the network driver interface to allow network-level access
 	// for sub-classes
+	// TODO: check if at the end of multi-gateway support development is still
+	// needed
 	protected ZWaveNetwork network;
+
+	// a reference to the actual handler managing the adapter to which the
+	// device is connected
+	protected ZWaveNetworkHandler handler;
 
 	// the state of the device associated to this driver
 	protected DeviceStatus currentState;
@@ -51,6 +58,9 @@ public abstract class ZWaveDriverInstance implements StatefulDevice
 	// the endpoint address associated to this device by means of the gateway
 	// attribute
 	protected int gatewayNodeId;
+
+	// the URL of the endpoint at which the gateway is reachable
+	protected String gatewayEndpoint;
 
 	// the unique identifier associated with this device
 	protected ZWaveNodeInfo nodeInfo;
@@ -109,8 +119,8 @@ public abstract class ZWaveDriverInstance implements StatefulDevice
 	 *            the device to which this driver is attached/associated //TODO
 	 */
 	public ZWaveDriverInstance(ZWaveNetwork network, ControllableDevice device,
-			int deviceId, Set<Integer> instancesId, int gatewayNodeId,
-			int updateTimeMillis, BundleContext context)
+			int deviceId, Set<Integer> instancesId, String gatewayEndpoint,
+			int gatewayNodeId, int updateTimeMillis, BundleContext context)
 	{
 		// store a reference to the network driver
 		this.network = network;
@@ -118,8 +128,12 @@ public abstract class ZWaveDriverInstance implements StatefulDevice
 		// store a reference to the associate device
 		this.device = device;
 
-		// store the endpoint address for the attached device
+		// store the nodeid associated to the adapter
 		this.gatewayNodeId = gatewayNodeId;
+
+		// store the endpoint address for the gateway to which connects the
+		// attached device
+		this.gatewayEndpoint = gatewayEndpoint;
 
 		// store update time
 		this.updateTimeMillis = updateTimeMillis;
@@ -150,7 +164,7 @@ public abstract class ZWaveDriverInstance implements StatefulDevice
 
 		// associate the device-specific driver to the network driver
 		// for (ModbusRegisterInfo register : this.managedRegisters)
-		addToNetworkDriver(nodeInfo);
+		this.handler = addToNetworkDriver(nodeInfo);
 	}
 
 	/***
@@ -160,13 +174,6 @@ public abstract class ZWaveDriverInstance implements StatefulDevice
 	 */
 	private void fillConfiguration()
 	{
-
-		// gets the properties shared by almost all Modbus devices, i.e. the
-		// register address, the slave id, the register type and the unit of
-		// measure
-		// It must be noticed that such informations are specified for each
-		// command/notification while no common parameters are defined/handled
-
 		// get parameters associated to each device command (if any)
 		Set<ElementDescription> commandsSpecificParameters = device
 				.getDeviceDescriptor().getCommandSpecificParams();
@@ -184,25 +191,8 @@ public abstract class ZWaveDriverInstance implements StatefulDevice
 			// get the real command name
 			String realCommandName = params.get(ZWaveInfo.COMMAND_NAME);
 
-			/*
-			 * // get the Modbus register address String registerAddress =
-			 * params.get(ZWaveInfo.REGISTER_ADDRESS);
-			 * 
-			 * // get the Modbus register unit of measure String unitOfMeasure =
-			 * params.get(ZWaveInfo.REGISTER_UOM);
-			 * 
-			 * // get the Modbus register type String registerType =
-			 * params.get(ZWaveInfo.REGISTER_TYPE);
-			 * 
-			 * // get the Modbus register slave id String registerSlaveId =
-			 * params.get(ZWaveInfo.SLAVE_ID);
-			 * 
-			 * // get the Modbus register scale factor if needed String
-			 * scaleFactor = params.get(ZWaveInfo.SCALE_FACTOR);
-			 */
-
-			CNParameters cmdInfo = new CNParameters(
-					realCommandName, parameter.getElementParams());
+			CNParameters cmdInfo = new CNParameters(realCommandName,
+					parameter.getElementParams());
 			// add the command to data point entry
 			command2Register.put(cmdInfo, nodeInfo);
 		}
@@ -217,23 +207,6 @@ public abstract class ZWaveDriverInstance implements StatefulDevice
 			// get the real command name
 			String notificationName = params.get(ZWaveInfo.NOTIFICATION_NAME);
 
-			/*
-			 * // get the Modbus register address String registerAddress =
-			 * params.get(ZWaveInfo.REGISTER_ADDRESS);
-			 * 
-			 * // get the Modbus register unit of measure String unitOfMeasure =
-			 * params.get(ZWaveInfo.REGISTER_UOM);
-			 * 
-			 * // get the Modbus register type String registerType =
-			 * params.get(ZWaveInfo.REGISTER_TYPE);
-			 * 
-			 * // get the Modbus register slave id String registerSlaveId =
-			 * params.get(ZWaveInfo.SLAVE_ID);
-			 * 
-			 * // get the Modbus register scale factor if needed String
-			 * scaleFactor = params.get(ZWaveInfo.SCALE_FACTOR);
-			 */
-
 			// fill the data point to notification map, if the data point
 			// has
 			// never been registered create a new entry in the map.
@@ -247,8 +220,8 @@ public abstract class ZWaveDriverInstance implements StatefulDevice
 			}
 			// add the notification name to the set associated to the dp
 			// datapoint
-			CNParameters nInfo = new CNParameters(
-					notificationName, parameter.getElementParams());
+			CNParameters nInfo = new CNParameters(notificationName,
+					parameter.getElementParams());
 			notificationNames.add(nInfo);
 		}
 	}
@@ -266,6 +239,14 @@ public abstract class ZWaveDriverInstance implements StatefulDevice
 	public int getGatewayNodeId()
 	{
 		return gatewayNodeId;
+	}
+
+	/**
+	 * @return the gatewayEndpoint
+	 */
+	public String getGatewayEndpoint()
+	{
+		return gatewayEndpoint;
 	}
 
 	@Override
@@ -328,8 +309,9 @@ public abstract class ZWaveDriverInstance implements StatefulDevice
 	 * 
 	 * @param sNodeId
 	 *            the node to add.
+	 * @return 
 	 */
-	protected abstract void addToNetworkDriver(ZWaveNodeInfo nodeInfo);
+	protected abstract ZWaveNetworkHandler addToNetworkDriver(ZWaveNodeInfo nodeInfo);
 
 	/**
 	 * Override and return true if it is the controller, false otherwise

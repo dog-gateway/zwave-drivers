@@ -38,6 +38,7 @@ import it.polito.elite.dog.drivers.zwave.model.zway.json.Instance;
 import it.polito.elite.dog.drivers.zwave.network.ZWaveDriverInstance;
 import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
+import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -54,8 +55,8 @@ import javax.measure.unit.UnitFormat;
 import org.osgi.framework.BundleContext;
 import org.osgi.service.log.LogService;
 
-public class ZWaveTemperatureAndHumiditySensorDriverInstance extends
-		ZWaveDriverInstance implements TemperatureAndHumiditySensor
+public class ZWaveTemperatureAndHumiditySensorDriverInstance
+		extends ZWaveDriverInstance implements TemperatureAndHumiditySensor
 {
 
 	// the class logger
@@ -68,13 +69,13 @@ public class ZWaveTemperatureAndHumiditySensorDriverInstance extends
 	// the group set
 	private HashSet<Integer> groups;
 
-	public ZWaveTemperatureAndHumiditySensorDriverInstance(
-			ZWaveNetwork network, ControllableDevice device, int deviceId,
-			Set<Integer> instancesId, int gatewayNodeId, int updateTimeMillis,
+	public ZWaveTemperatureAndHumiditySensorDriverInstance(ZWaveNetwork network,
+			ControllableDevice device, int deviceId, Set<Integer> instancesId,
+			String gatewayEndpoint, int gatewayNodeId, int updateTimeMillis,
 			BundleContext context)
 	{
-		super(network, device, deviceId, instancesId, gatewayNodeId,
-				updateTimeMillis, context);
+		super(network, device, deviceId, instancesId, gatewayEndpoint,
+				gatewayNodeId, updateTimeMillis, context);
 
 		// build inner data structures
 		this.groups = new HashSet<Integer>();
@@ -109,7 +110,8 @@ public class ZWaveTemperatureAndHumiditySensorDriverInstance extends
 		{
 			public void run()
 			{
-				network.read(nodeInfo, true);
+				if (handler != null)
+					handler.read(nodeInfo, true);
 			}
 		};
 
@@ -190,16 +192,16 @@ public class ZWaveTemperatureAndHumiditySensorDriverInstance extends
 							.toString());
 
 					// Read sensorType
-					String sensorType = (String) sensorData
-							.getDataElemValue(CommandClassesData.FIELD_SENSORTYPE);
+					String sensorType = (String) sensorData.getDataElemValue(
+							CommandClassesData.FIELD_SENSORTYPE);
 
 					// parse unit of measure
-					String unitOfMeasure = (String) sensorData
-							.getDataElemValue(CommandClassesData.FIELD_SCALESTRING);
+					String unitOfMeasure = (String) sensorData.getDataElemValue(
+							CommandClassesData.FIELD_SCALESTRING);
 
 					// forward to the right method
-					measureUpdated = this.forwardMeasure(measure,
-							unitOfMeasure, sensorType, updateTime);
+					measureUpdated = this.forwardMeasure(measure, unitOfMeasure,
+							sensorType, updateTime);
 
 				}
 				catch (NumberFormatException ne)
@@ -217,10 +219,9 @@ public class ZWaveTemperatureAndHumiditySensorDriverInstance extends
 	private void changeTemperatureState(double measure, String unitOfMeasure)
 	{
 		// build the temperature measure
-		DecimalMeasure<?> temperatureValue = DecimalMeasure.valueOf(measure
-				+ " "
-				+ (unitOfMeasure.contains("C") ? SI.CELSIUS.toString()
-						: NonSI.FAHRENHEIT.toString()));
+		DecimalMeasure<?> temperatureValue = DecimalMeasure
+				.valueOf(measure + " " + (unitOfMeasure.contains("C")
+						? SI.CELSIUS.toString() : NonSI.FAHRENHEIT.toString()));
 
 		// if the given temperature is null, than the network-level
 		// value is not up-to-date
@@ -243,8 +244,8 @@ public class ZWaveTemperatureAndHumiditySensorDriverInstance extends
 	private void changeHumidityState(double measure, String unitOfMeasure)
 	{
 		// build the humidity measure
-		DecimalMeasure<?> relativeHumidity = DecimalMeasure.valueOf(measure
-				+ " " + unitOfMeasure);
+		DecimalMeasure<?> relativeHumidity = DecimalMeasure
+				.valueOf(measure + " " + unitOfMeasure);
 		// if the given temperature is null, than the network-level
 		// value is not up-to-date
 		if (relativeHumidity != null)
@@ -272,9 +273,9 @@ public class ZWaveTemperatureAndHumiditySensorDriverInstance extends
 	}
 
 	@Override
-	protected void addToNetworkDriver(ZWaveNodeInfo nodeInfo)
+	protected ZWaveNetworkHandler addToNetworkDriver(ZWaveNodeInfo nodeInfo)
 	{
-		network.addDriver(nodeInfo, updateTimeMillis, this);
+		return network.addDriver(nodeInfo, updateTimeMillis, this);
 	}
 
 	@Override
@@ -311,17 +312,17 @@ public class ZWaveTemperatureAndHumiditySensorDriverInstance extends
 	@Override
 	public Measure<?, ?> getRelativeHumidity()
 	{
-		return (Measure<?, ?>) currentState.getState(
-				HumidityMeasurementState.class.getSimpleName())
+		return (Measure<?, ?>) currentState
+				.getState(HumidityMeasurementState.class.getSimpleName())
 				.getCurrentStateValue()[0].getValue();
 	}
 
 	@Override
 	public Measure<?, ?> getTemperature()
 	{
-		return (Measure<?, ?>) currentState.getState(
-				TemperatureState.class.getSimpleName()).getCurrentStateValue()[0]
-				.getValue();
+		return (Measure<?, ?>) currentState
+				.getState(TemperatureState.class.getSimpleName())
+				.getCurrentStateValue()[0].getValue();
 	}
 
 	@Override
@@ -378,8 +379,8 @@ public class ZWaveTemperatureAndHumiditySensorDriverInstance extends
 		{
 			instanceCommand.put(instanceId, ccSet);
 		}
-		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(deviceId, instanceCommand,
-				isController);
+		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(this.gatewayEndpoint,
+				deviceId, instanceCommand, isController);
 
 		return nodeInfo;
 	}
