@@ -32,6 +32,7 @@ import it.polito.elite.dog.core.library.model.statevalue.ActiveEnergyStateValue;
 import it.polito.elite.dog.core.library.model.statevalue.ActivePowerStateValue;
 import it.polito.elite.dog.core.library.model.statevalue.OffStateValue;
 import it.polito.elite.dog.core.library.model.statevalue.OnStateValue;
+import it.polito.elite.dog.core.library.model.statevalue.StateValue;
 import it.polito.elite.dog.core.library.util.LogHelper;
 import it.polito.elite.dog.drivers.zwave.ZWaveAPI;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.CommandClasses;
@@ -113,7 +114,7 @@ public class ZWaveMeteringPowerOutletInstance extends ZWaveDriverInstance
 				+ SI.KILO(SI.WATT.times(NonSI.HOUR)).toString()));
 		this.currentState.setState(
 				SinglePhaseActiveEnergyState.class.getSimpleName(),
-				new SinglePhaseActiveEnergyState(energyStateValue));
+				new SinglePhaseActiveEnergyState(new StateValue[]{energyStateValue}));
 
 		// initialize the power state value
 		ActivePowerStateValue powerStateValue = new ActivePowerStateValue();
@@ -121,7 +122,7 @@ public class ZWaveMeteringPowerOutletInstance extends ZWaveDriverInstance
 				+ SI.WATT.toString()));
 		this.currentState.setState(
 				SinglePhaseActivePowerMeasurementState.class.getSimpleName(),
-				new SinglePhaseActivePowerMeasurementState(powerStateValue));
+				new SinglePhaseActivePowerMeasurementState(new StateValue[]{powerStateValue}));
 
 		// get the initial state of the device
 		Runnable worker = new Runnable()
@@ -310,7 +311,7 @@ public class ZWaveMeteringPowerOutletInstance extends ZWaveDriverInstance
 		pValue.setValue(value);
 		currentState.setState(
 				SinglePhaseActiveEnergyState.class.getSimpleName(),
-				new SinglePhaseActiveEnergyState(pValue));
+				new SinglePhaseActiveEnergyState(new StateValue[]{pValue}));
 
 		// debug
 		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
@@ -339,7 +340,7 @@ public class ZWaveMeteringPowerOutletInstance extends ZWaveDriverInstance
 		pValue.setValue(powerValue);
 		currentState.setState(
 				SinglePhaseActivePowerMeasurementState.class.getSimpleName(),
-				new SinglePhaseActivePowerMeasurementState(pValue));
+				new SinglePhaseActivePowerMeasurementState(new StateValue[]{pValue}));
 
 		// debug
 		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
