@@ -51,7 +51,7 @@ waitBeforeDeviceInstall=2500
 deviceDB=devicedb/zwave-devices.properties
 ```
 ### Device discovery database
-Dog zwave-drivers, and in particular, the Dog zwave-gateway exploit a simple, file-based database of devices which maps real devices to corresponding Dog (and thus [DogOnt](http://iot-ontologies.github.io/dogont)) device classes. Real devices are identified by means of the unique triple of ... The provided device db can be asily estended by adding new lines with the same format ```<triple = Dog class>``` provided that an existing class is defined which can be mapped to the new device.
+Dog zwave-drivers, and in particular, the Dog zwave-gateway exploit a simple, file-based database of devices which maps real devices to corresponding Dog (and thus [DogOnt](http://iot-ontologies.github.io/dogont)) device classes. Real devices are identified by means of the unique triple of ```ManufacturerId(decimal)- Device type(decimal) - Device id (decimal)```. The provided device db can be asily estended by adding new lines with the same format ```<triple = Dog class>``` provided that an existing class is defined which can be mapped to the new device. For example, the full [set](https://github.com/OpenZWave/open-zwave/blob/master/config/manufacturer_specific.xml) of devices supported in [OpenZwave](https://github.com/OpenZWave) can be easily added, paying attention to the fact that in OpenZwave the above ids are represented as hexadecimal numbers.
 
 A sample device db is reported below:
 
