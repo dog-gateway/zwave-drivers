@@ -51,7 +51,7 @@ waitBeforeDeviceInstall=2500
 deviceDB=devicedb/zwave-devices.properties
 ```
 ### Device discovery database
-Dog zwave-drivers, and in particular, the Dog zwave-gateway exploit a simple, file-based database of devices which maps real devices to corresponding Dog (and thus [DogOnt](http://iot-ontologies.github.io/dogont)) device classes. Real devices are identified by means of the unique triple of ```ManufacturerId(decimal)- Device type(decimal) - Device id (decimal)```. The provided device db can be asily estended by adding new lines with the same format ```<triple = Dog class>``` provided that an existing class is defined which can be mapped to the new device. For example, the full [set](https://github.com/OpenZWave/open-zwave/blob/master/config/manufacturer_specific.xml) of devices supported in [OpenZwave](https://github.com/OpenZWave) can be easily added, paying attention to the fact that in OpenZwave the above ids are represented as hexadecimal numbers.
+Dog zwave-drivers, and in particular, the Dog zwave-gateway exploit a simple, file-based database of devices which maps real devices to corresponding Dog (and thus [DogOnt](http://iot-ontologies.github.io/dogont)) device classes. Real devices are identified by means of the unique triple of ```ManufacturerId(decimal)- Device type(decimal) - Device id (decimal)```. The provided device db can be easily estended by adding new lines with the same format ```<triple = Dog class>``` provided that an existing class is defined which can be mapped to the new device. For example, the full [set](https://github.com/OpenZWave/open-zwave/blob/master/config/manufacturer_specific.xml) of devices supported in [OpenZwave](https://github.com/OpenZWave) can be easily added, paying attention to the fact that in OpenZwave the above ids are represented as hexadecimal numbers.
 
 A sample device db is reported below:
 
@@ -106,3 +106,40 @@ A sample device db is reported below:
 96-2-1=DoorSensor
 96-514-1=DoorSensor
 ```
+### Dog environment configuration file
+Dog supports discovery of zwave-devices in the association / disassociation phase, only (support to discovery of already associated devices is planned in a near future). However, to successfully detect association/disassociation a connection towards one ore more ZWay servers shall be configured. This requires to manually add a "gateway" section in the Dog environment configuration files. A sample gateway configuration section is reported below.
+
+```
+<dhc:device class="ZWaveGateway" id="zwave-gateway" domoticSystem="ZWave">
+            <dhc:description>The ZWave X gateway
+			</dhc:description>
+            <dhc:isIn>Office</dhc:isIn>
+            <dhc:param name="IPAddress" value="http://xxx.xxx.xxx.xxx"/>
+            <dhc:param name="port" value="8083"/>
+            <dhc:param name="nodeId" value="1" type="network"/>
+            <dhc:controlFunctionality class="AssociateFunctionality">
+                <dhc:commands>
+                    <dhc:command class="AssociateCommand" name="AssociateCommand_zwave-gateway" id="AssociateCommand_zwave-gateway">
+                        <dhc:param name="realCommandName" value="associate"/>
+                    </dhc:command>
+                    <dhc:command class="DisassociateCommand" name="DisassociateCommand_zwave-gateway" id="DisassociateCommand_zwave-gateway">
+                        <dhc:param name="realCommandName" value="disassociate"/>
+                    </dhc:command>
+                </dhc:commands>
+            </dhc:controlFunctionality>
+            <dhc:notificationFunctionality class="AssociationNotificationFunctionality">
+                <dhc:notifications>
+                    <dhc:notification class="AssociatingDeviceNotification" id="AssociatingDeviceNotification_zwave-gateway">
+                        <dhc:param name="nParams" value="0"/>
+                        <dhc:param name="notificationName" value="associating"/>
+                    </dhc:notification>
+                    <dhc:notification class="DisassociatingDeviceNotification" id="DisassociatingDeviceNotification_zwave-gateway">
+                        <dhc:param name="nParams" value="0"/>
+                        <dhc:param name="notificationName" value="disassociating"/>
+                    </dhc:notification>
+                </dhc:notifications>
+            </dhc:notificationFunctionality>
+        </dhc:device>
+```
+
+Once added, the gateway shall be restarted for the changes to become effective. All other zwave-device entries are created through association/disassociation time discovery.
