@@ -27,6 +27,7 @@ import it.polito.elite.dog.core.library.model.state.SinglePhaseActiveEnergyState
 import it.polito.elite.dog.core.library.model.state.SinglePhaseActivePowerMeasurementState;
 import it.polito.elite.dog.core.library.model.statevalue.ActiveEnergyStateValue;
 import it.polito.elite.dog.core.library.model.statevalue.ActivePowerStateValue;
+import it.polito.elite.dog.core.library.model.statevalue.StateValue;
 import it.polito.elite.dog.core.library.util.LogHelper;
 import it.polito.elite.dog.drivers.zwave.ZWaveAPI;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.CommandClasses;
@@ -91,11 +92,11 @@ public class ZWaveSinglePhaseElectricityMeterInstance extends
 		// initialize the state
 		this.currentState.setState(
 				SinglePhaseActiveEnergyState.class.getSimpleName(),
-				new SinglePhaseActiveEnergyState(new ActiveEnergyStateValue()));
+				new SinglePhaseActivePowerMeasurementState(new StateValue[]{new ActiveEnergyStateValue()}));
 		this.currentState.setState(SinglePhaseActivePowerMeasurementState.class
-				.getSimpleName(), new SinglePhaseActivePowerMeasurementState(
-				new ActivePowerStateValue()));
-
+				.getSimpleName(), 
+				new SinglePhaseActivePowerMeasurementState(new StateValue[]{new ActivePowerStateValue()}));
+				
 		// get the initial state of the device
 		Runnable worker = new Runnable()
 		{
@@ -206,7 +207,7 @@ public class ZWaveSinglePhaseElectricityMeterInstance extends
 		pValue.setValue(value);
 		currentState.setState(
 				SinglePhaseActiveEnergyState.class.getSimpleName(),
-				new SinglePhaseActiveEnergyState(pValue));
+				new SinglePhaseActiveEnergyState(new StateValue[]{pValue}));
 
 		// debug
 		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
@@ -235,7 +236,7 @@ public class ZWaveSinglePhaseElectricityMeterInstance extends
 		pValue.setValue(powerValue);
 		currentState.setState(
 				SinglePhaseActivePowerMeasurementState.class.getSimpleName(),
-				new SinglePhaseActivePowerMeasurementState(pValue));
+				new SinglePhaseActivePowerMeasurementState(new StateValue[]{pValue}));
 
 		// debug
 		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
