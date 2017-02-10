@@ -53,5 +53,7 @@ public class ZWaveInfo extends ConfigurationConstants
 
 	public static final String DEFAULT_PORT = "8083";
 
+	//the controller node id
+	public static final int CONTROLLER_NODE_ID = 1;
 	
 }
