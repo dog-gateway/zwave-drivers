@@ -121,8 +121,10 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 					"0.0 " + SI.KILO(SI.WATT.times(NonSI.HOUR)).toString()));
 			this.currentState.setState(
 					SinglePhaseActiveEnergyState.class.getSimpleName(),
+
 					new SinglePhaseActiveEnergyState(
 							new StateValue[] { energyStateValue }));
+
 		}
 
 		// initialize the power state value
@@ -131,8 +133,10 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 				.setValue(DecimalMeasure.valueOf("0.0 " + SI.WATT.toString()));
 		this.currentState.setState(
 				SinglePhaseActivePowerMeasurementState.class.getSimpleName(),
+
 				new SinglePhaseActivePowerMeasurementState(
 						new StateValue[] { powerStateValue }));
+
 
 		LevelStateValue levelValue = new LevelStateValue();
 		levelValue.setValue(DecimalMeasure.valueOf(0, Unit.ONE));
@@ -258,6 +262,7 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 				.getState(SinglePhaseActiveEnergyState.class.getSimpleName())
 				.getCurrentStateValue()[0].setValue(value);
 
+
 		// debug
 		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
 				+ " active energy " + value.toString());
@@ -284,6 +289,7 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 		this.currentState.getState(
 				SinglePhaseActivePowerMeasurementState.class.getSimpleName())
 				.getCurrentStateValue()[0].setValue(powerValue);
+
 
 		// debug
 		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
@@ -627,6 +633,7 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 				SinglePhaseActivePowerMeasurementState.class.getSimpleName())
 				.getCurrentStateValue()[0].setValue(powerValue);
 
+
 		// debug
 		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
 				+ " active power " + powerValue.toString());
@@ -652,6 +659,7 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 		this.currentState
 				.getState(SinglePhaseActiveEnergyState.class.getSimpleName())
 				.getCurrentStateValue()[0].setValue(value);
+
 
 		// debug
 		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()

@@ -101,6 +101,7 @@ public class ZWaveSinglePhaseElectricityMeterInstance
 				new SinglePhaseActivePowerMeasurementState(
 						new StateValue[] { new ActivePowerStateValue() }));
 
+
 		// get the initial state of the device
 		Runnable worker = new Runnable()
 		{
@@ -211,6 +212,7 @@ public class ZWaveSinglePhaseElectricityMeterInstance
 		this.currentState
 				.getState(SinglePhaseActiveEnergyState.class.getSimpleName())
 				.getCurrentStateValue()[0].setValue(value);
+
 
 		// debug
 		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
