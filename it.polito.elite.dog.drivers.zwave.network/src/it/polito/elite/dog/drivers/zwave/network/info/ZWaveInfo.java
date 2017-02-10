@@ -22,13 +22,25 @@ import it.polito.elite.dog.core.library.model.ConfigurationConstants;
 public class ZWaveInfo extends ConfigurationConstants
 {
 	// the manufacturer identifier (ZWave)
-	public static String MANUFACTURER = "ZWave";	
+	public static final String MANUFACTURER = "ZWave";	
 	
 	// the node ID
-	public static String NODE_ID = "nodeId";
+	public static final String NODE_ID = "nodeId";
 	
 	// the instance ID
-	public static String INSTANCE_ID = "instanceId";
+	public static final String INSTANCE_ID = "instanceId";
+	
+	// the gateway IPAddress
+	public static final String IP_ADDRESS = "IPAddress";
+	
+	// the gateway port
+	public static final  String PORT = "port";
+	
+	// the gateway username, if any
+	public static final String USERNAME = "username";
+	
+	// the gateway password, if any
+	public static final String PASSWORD = "password";
 	
 	// constant for configuration
 	public static final String PROPERTY_UPDATETIME = "updateTimeMillis";
@@ -39,5 +51,9 @@ public class ZWaveInfo extends ConfigurationConstants
 	// the persistent store configuration property
 	public static final String PROPERTY_STEP_PERCENT = "stepAsPercentage";
 
+	public static final String DEFAULT_PORT = "8083";
+
+	//the controller node id
+	public static final int CONTROLLER_NODE_ID = 1;
 	
 }

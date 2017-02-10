@@ -40,10 +40,10 @@ public class ZWaveMovementSensorDriver extends ZWaveDeviceDriver
 	@Override
 	public ZWaveDriverInstance createZWaveDriverInstance(
 			ZWaveNetwork zWaveNetwork, ControllableDevice device, int nodeId,
-			HashSet<Integer> instancesId, int gatewayNodeId,
+			HashSet<Integer> instancesId, String gatewayEndpoint, int gatewayNodeId,
 			int updateTimeMillis, BundleContext context)
 	{
 		
-		return new ZWaveMovementSensorDriverInstance(zWaveNetwork, device, nodeId, instancesId, gatewayNodeId, updateTimeMillis, context);
+		return new ZWaveMovementSensorDriverInstance(zWaveNetwork, device, nodeId, instancesId, gatewayEndpoint, gatewayNodeId, updateTimeMillis, context);
 	}
 }

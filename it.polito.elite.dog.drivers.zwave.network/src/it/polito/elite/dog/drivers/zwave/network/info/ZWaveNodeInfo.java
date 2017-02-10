@@ -23,7 +23,10 @@ import java.util.Set;
 
 public class ZWaveNodeInfo
 {
-	// the IP address of the gateway to which a specific device is connected
+	// the adapter to which is connected
+	private String adapterEndpoint; //TODO: InetAddress or URL are probably better
+	
+	// the device node_id on the zwave adapter
 	private int sDeviceNodeId;
 	
 	// HashMap of instancesId available on this node and a set of Get command class associated to update sensor value
@@ -40,13 +43,30 @@ public class ZWaveNodeInfo
 	 * @param hmInstanceNodeId HashMap of instancesId available on this node and a set of Get command class associated to update sensor value
 	 * @param bIsController true if this is the controller device
 	 */
-	public ZWaveNodeInfo(int sDeviceNodeId, HashMap<Integer,Set<Integer>> hmInstanceGetSensorCC, boolean bIsController)
+	public ZWaveNodeInfo(String adapterEndpoint, int sDeviceNodeId, HashMap<Integer,Set<Integer>> hmInstanceGetSensorCC, boolean bIsController)
 	{
+		this.adapterEndpoint = adapterEndpoint;
 		this.sDeviceNodeId = sDeviceNodeId;
 		this.hmInstanceGetSensorCC = hmInstanceGetSensorCC;
 		this.bIsController = bIsController;
 	}
 	
+	/**
+	 * @return the adapterEndpoint
+	 */
+	public String getAdapterEndpoint()
+	{
+		return adapterEndpoint;
+	}
+
+	/**
+	 * @param adapterEndpoint the adapterEndpoint to set
+	 */
+	public void setAdapterEndpoint(String adapterEndpoint)
+	{
+		this.adapterEndpoint = adapterEndpoint;
+	}
+
 	/**
 	 * @return the sDeviceNodeId
 	 */
@@ -94,4 +114,59 @@ public class ZWaveNodeInfo
 	public void setIsController(boolean bIsController) {
 		this.bIsController = bIsController;
 	}
+
+	/* (non-Javadoc)
+	 * @see java.lang.Object#hashCode()
+	 */
+	@Override
+	public int hashCode()
+	{
+		final int prime = 31;
+		int result = 1;
+		result = prime * result
+				+ ((adapterEndpoint == null) ? 0 : adapterEndpoint.hashCode());
+		result = prime * result + sDeviceNodeId;
+		return result;
+	}
+
+	/* (non-Javadoc)
+	 * @see java.lang.Object#equals(java.lang.Object)
+	 */
+	@Override
+	public boolean equals(Object obj)
+	{
+		if (this == obj)
+		{
+			return true;
+		}
+		if (obj == null)
+		{
+			return false;
+		}
+		if (getClass() != obj.getClass())
+		{
+			return false;
+		}
+		
+		ZWaveNodeInfo other = (ZWaveNodeInfo) obj;
+		
+		if (adapterEndpoint == null)
+		{
+			if (other.adapterEndpoint != null)
+			{
+				return false;
+			}
+		}
+		else if (!adapterEndpoint.equals(other.adapterEndpoint))
+		{
+			return false;
+		}
+		if (sDeviceNodeId != other.sDeviceNodeId)
+		{
+			return false;
+		}
+		return true;
+	}
+	
+	
 }

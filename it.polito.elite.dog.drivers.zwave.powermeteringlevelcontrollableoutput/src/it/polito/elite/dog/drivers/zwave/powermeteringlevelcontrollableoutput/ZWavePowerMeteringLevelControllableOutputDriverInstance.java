@@ -44,6 +44,7 @@ import it.polito.elite.dog.drivers.zwave.model.zway.json.Instance;
 import it.polito.elite.dog.drivers.zwave.network.ZWaveDriverInstance;
 import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
+import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -78,11 +79,11 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 
 	public ZWavePowerMeteringLevelControllableOutputDriverInstance(
 			ZWaveNetwork network, ControllableDevice device, int deviceId,
-			Set<Integer> instancesId, int gatewayNodeId, int updateTimeMillis,
-			int stepPercentage, BundleContext context)
+			Set<Integer> instancesId, String gatewayEndpoint, int gatewayNodeId,
+			int updateTimeMillis, int stepPercentage, BundleContext context)
 	{
-		super(network, device, deviceId, instancesId, gatewayNodeId,
-				updateTimeMillis, context);
+		super(network, device, deviceId, instancesId, gatewayEndpoint,
+				gatewayNodeId, updateTimeMillis, context);
 
 		this.stepPercentage = stepPercentage;
 
@@ -116,20 +117,26 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 		{
 			// initialize the energy state value
 			ActiveEnergyStateValue energyStateValue = new ActiveEnergyStateValue();
-			energyStateValue.setValue(DecimalMeasure.valueOf("0.0 "
-					+ SI.KILO(SI.WATT.times(NonSI.HOUR)).toString()));
+			energyStateValue.setValue(DecimalMeasure.valueOf(
+					"0.0 " + SI.KILO(SI.WATT.times(NonSI.HOUR)).toString()));
 			this.currentState.setState(
 					SinglePhaseActiveEnergyState.class.getSimpleName(),
-					new SinglePhaseActiveEnergyState(new StateValue[]{energyStateValue}));
+
+					new SinglePhaseActiveEnergyState(
+							new StateValue[] { energyStateValue }));
+
 		}
 
 		// initialize the power state value
 		ActivePowerStateValue powerStateValue = new ActivePowerStateValue();
-		powerStateValue.setValue(DecimalMeasure.valueOf("0.0 "
-				+ SI.WATT.toString()));
+		powerStateValue
+				.setValue(DecimalMeasure.valueOf("0.0 " + SI.WATT.toString()));
 		this.currentState.setState(
 				SinglePhaseActivePowerMeasurementState.class.getSimpleName(),
-				new SinglePhaseActivePowerMeasurementState(new StateValue[]{powerStateValue}));
+
+				new SinglePhaseActivePowerMeasurementState(
+						new StateValue[] { powerStateValue }));
+
 
 		LevelStateValue levelValue = new LevelStateValue();
 		levelValue.setValue(DecimalMeasure.valueOf(0, Unit.ONE));
@@ -141,7 +148,8 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 		{
 			public void run()
 			{
-				network.read(nodeInfo, true);
+				if (handler != null)
+					handler.read(nodeInfo, true);
 			}
 		};
 
@@ -182,8 +190,8 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 			nLevel = ccEntry.getLevelAsInt();
 
 			// change the state and update corresponding flags
-			updatedOnOff = changeOnOffState((nLevel > 0) ? OnOffState.ON
-					: OnOffState.OFF);
+			updatedOnOff = changeOnOffState(
+					(nLevel > 0) ? OnOffState.ON : OnOffState.OFF);
 			updatedLevel = changeLevelState(nLevel);
 
 		}
@@ -214,8 +222,8 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 				DataElemObject energyEntry = ccElectricityEntry.get("0");
 				if (energyEntry != null)
 				{
-					this.changeActiveEnergyState(Double.valueOf(energyEntry
-							.getDataElemValue("val").toString()));
+					this.changeActiveEnergyState(Double.valueOf(
+							energyEntry.getDataElemValue("val").toString()));
 					energyUpdated = true;
 				}
 
@@ -223,8 +231,8 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 				DataElemObject powerEntry = ccElectricityEntry.get("2");
 				if (powerEntry != null)
 				{
-					this.changeActivePowerState(Double.valueOf(powerEntry
-							.getDataElemValue("val").toString()));
+					this.changeActivePowerState(Double.valueOf(
+							powerEntry.getDataElemValue("val").toString()));
 					powerUpdated = true;
 
 				}
@@ -250,11 +258,10 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 				+ SI.KILO(SI.WATT.times(NonSI.HOUR)).toString());
 
 		// update the state
-		ActiveEnergyStateValue pValue = new ActiveEnergyStateValue();
-		pValue.setValue(value);
-		currentState.setState(
-				SinglePhaseActiveEnergyState.class.getSimpleName(),
-				new SinglePhaseActiveEnergyState(new StateValue[]{pValue}));
+		this.currentState
+				.getState(SinglePhaseActiveEnergyState.class.getSimpleName())
+				.getCurrentStateValue()[0].setValue(value);
+
 
 		// debug
 		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
@@ -275,15 +282,14 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 	{
 
 		// build the power measure
-		DecimalMeasure<?> powerValue = DecimalMeasure.valueOf(activePower + " "
-				+ SI.WATT.toString());
+		DecimalMeasure<?> powerValue = DecimalMeasure
+				.valueOf(activePower + " " + SI.WATT.toString());
 
 		// update the state
-		ActivePowerStateValue pValue = new ActivePowerStateValue();
-		pValue.setValue(powerValue);
-		currentState.setState(
-				SinglePhaseActivePowerMeasurementState.class.getSimpleName(),
-				new SinglePhaseActivePowerMeasurementState(new StateValue[]{pValue}));
+		this.currentState.getState(
+				SinglePhaseActivePowerMeasurementState.class.getSimpleName())
+				.getCurrentStateValue()[0].setValue(powerValue);
+
 
 		// debug
 		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
@@ -388,8 +394,8 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 		}
 
 		// debug
-		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
-				+ " dimmer at " + nLevel);
+		logger.log(LogService.LOG_DEBUG,
+				"Device " + device.getDeviceId() + " dimmer at " + nLevel);
 
 		return stateChanged;
 	}
@@ -402,9 +408,9 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 	}
 
 	@Override
-	protected void addToNetworkDriver(ZWaveNodeInfo nodeInfo)
+	protected ZWaveNetworkHandler addToNetworkDriver(ZWaveNodeInfo nodeInfo)
 	{
-		network.addDriver(nodeInfo, updateTimeMillis, this);
+		return network.addDriver(nodeInfo, updateTimeMillis, this);
 	}
 
 	@Override
@@ -424,8 +430,9 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 	{
 		// Sends on command to all instances, probably only one in this case
 		for (Integer instanceId : nodeInfo.getInstanceSet())
-			network.write(nodeInfo.getDeviceNodeId(), instanceId,
-					ZWaveAPI.COMMAND_CLASS_SWITCH_MULTILEVEL, "255");
+			if (this.handler != null)
+				this.handler.write(nodeInfo.getDeviceNodeId(), instanceId,
+						ZWaveAPI.COMMAND_CLASS_SWITCH_MULTILEVEL, "255");
 	}
 
 	@Override
@@ -433,8 +440,9 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 	{
 		// Sends off command to all instances, probably only one in this case
 		for (Integer instanceId : nodeInfo.getInstanceSet())
-			network.write(nodeInfo.getDeviceNodeId(), instanceId,
-					ZWaveAPI.COMMAND_CLASS_SWITCH_MULTILEVEL, "0");
+			if (this.handler != null)
+				this.handler.write(nodeInfo.getDeviceNodeId(), instanceId,
+						ZWaveAPI.COMMAND_CLASS_SWITCH_MULTILEVEL, "0");
 	}
 
 	@Override
@@ -452,8 +460,8 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 		{
 			instanceCommand.put(instanceId, ccSet);
 		}
-		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(deviceId, instanceCommand,
-				isController);
+		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(this.gatewayEndpoint,
+				deviceId, instanceCommand, isController);
 		return nodeInfo;
 	}
 
@@ -462,18 +470,19 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 	{
 		// Sends on command to all instances, probably only one in this case
 		for (Integer instanceId : nodeInfo.getInstanceSet())
-			network.write(nodeInfo.getDeviceNodeId(), instanceId,
-					ZWaveAPI.COMMAND_CLASS_SWITCH_MULTILEVEL, value.toString()
-							+ ", 0");
+			if (this.handler != null)
+				this.handler.write(nodeInfo.getDeviceNodeId(), instanceId,
+						ZWaveAPI.COMMAND_CLASS_SWITCH_MULTILEVEL,
+						value.toString() + ", 0");
 	}
 
 	@Override
 	public void stepDown()
 	{
 		// get the current level value
-		int currentValue = (Integer) currentState.getState(
-				LevelState.class.getSimpleName()).getCurrentStateValue()[0]
-				.getValue();
+		int currentValue = (Integer) currentState
+				.getState(LevelState.class.getSimpleName())
+				.getCurrentStateValue()[0].getValue();
 
 		// set to 100%
 		if (currentValue == 255)
@@ -491,9 +500,9 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 	public void stepUp()
 	{
 		// get the current level value
-		int currentValue = (Integer) currentState.getState(
-				LevelState.class.getSimpleName()).getCurrentStateValue()[0]
-				.getValue();
+		int currentValue = (Integer) currentState
+				.getState(LevelState.class.getSimpleName())
+				.getCurrentStateValue()[0].getValue();
 
 		// increase by step percentage
 		currentValue = Math.min(100, currentValue + this.stepPercentage);
@@ -620,11 +629,10 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 	public void notifyNewActivePowerValue(Measure<?, ?> powerValue)
 	{
 		// update the state
-		ActivePowerStateValue pValue = new ActivePowerStateValue();
-		pValue.setValue(powerValue);
-		currentState.setState(
-				SinglePhaseActivePowerMeasurementState.class.getSimpleName(),
-				new SinglePhaseActivePowerMeasurementState(new StateValue[]{pValue}));
+		this.currentState.getState(
+				SinglePhaseActivePowerMeasurementState.class.getSimpleName())
+				.getCurrentStateValue()[0].setValue(powerValue);
+
 
 		// debug
 		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
@@ -639,8 +647,8 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 	@Override
 	public Measure<?, ?> getActiveEnergyValue()
 	{
-		return (Measure<?, ?>) currentState.getState(
-				SinglePhaseActiveEnergyState.class.getSimpleName())
+		return (Measure<?, ?>) currentState
+				.getState(SinglePhaseActiveEnergyState.class.getSimpleName())
 				.getCurrentStateValue()[0].getValue();
 	}
 
@@ -648,11 +656,10 @@ public class ZWavePowerMeteringLevelControllableOutputDriverInstance extends
 	public void notifyNewActiveEnergyValue(Measure<?, ?> value)
 	{
 		// update the state
-		ActiveEnergyStateValue pValue = new ActiveEnergyStateValue();
-		pValue.setValue(value);
-		currentState.setState(
-				SinglePhaseActiveEnergyState.class.getSimpleName(),
-				new SinglePhaseActiveEnergyState(new StateValue[]{pValue}));
+		this.currentState
+				.getState(SinglePhaseActiveEnergyState.class.getSimpleName())
+				.getCurrentStateValue()[0].setValue(value);
+
 
 		// debug
 		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()

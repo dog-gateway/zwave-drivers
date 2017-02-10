@@ -201,6 +201,7 @@ public abstract class ZWaveDeviceDriver implements Driver, ManagedService
 			ZWaveDriverInstance driverInstance = this
 					.createZWaveDriverInstance(network.get(), device,
 							Integer.parseInt(sNodeID), instancesId,
+							this.gateway.get().getSpecificGateway(gateway).getGatewayEndpoint(),
 							this.gateway.get().getSpecificGateway(gateway)
 									.getNodeInfo().getDeviceNodeId(),
 							updateTimeMillis, context);
@@ -214,13 +215,17 @@ public abstract class ZWaveDeviceDriver implements Driver, ManagedService
 				this.managedInstances.put(device.getDeviceId(), driverInstance);
 			}
 		}
+		else
+		{
+			this.context.ungetService(reference);
+		}
 
 		return null;
 	}
 
 	public abstract ZWaveDriverInstance createZWaveDriverInstance(
 			ZWaveNetwork zWaveNetwork, ControllableDevice device, int nodeId,
-			HashSet<Integer> instancesId, int gatewayNodeId,
+			HashSet<Integer> instancesId, String string, int gatewayNodeId,
 			int updateTimeMillis, BundleContext context);
 
 	/**
