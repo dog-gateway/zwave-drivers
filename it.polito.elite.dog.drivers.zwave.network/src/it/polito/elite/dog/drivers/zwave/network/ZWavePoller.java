@@ -1,7 +1,7 @@
 /*
  * Dog  - Z-Wave
  * 
- * Copyright 2013 Davide Aimone  and Dario Bonino 
+ * Copyright 2013-2017 Davide Aimone  and Dario Bonino 
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package it.polito.elite.dog.drivers.zwave.network;
 
 import it.polito.elite.dog.core.library.util.LogHelper;
 import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
+import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,14 +30,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.osgi.service.log.LogService;
 
 /**
- * This thread implements a queue.
- * Every deltaT = ZWaveDriverImpl.getPollingTimeMillis(), it wakes-up and asks Z-Way server for system update. 
- * Later it checks TODO
- * successivamente controlla quali device devono essere triggerati in modo da far aggiornare il loro stato.
- *  Questo e' dovuto al fato che alcuni device non comunicano correttamente il loro cambio di stato al server zway, ed e' quindi 
- *  necessario che venga effettuata su di loro una GET da parte di ZWay. Questo thread si occupa di schedulare anche questo tipo di azione.
- *  Per aggiunger un device alla lista dei nodi da triggerare usare la addDeviceToQueue
- *
+ * This class implements the low-level ZWave polling Thread. Every polling time,
+ * the thread checks which devices are expected to report a new value. For all
+ * devices that have not yet reported a value, even if expected, a direct query
+ * at the ZWay level is triggered. This overcomes wrong or misaligned
+ * communication between the physical ZWave devices and the ZWay server
+ * interfaced by Dog.
  */
 public class ZWavePoller extends Thread
 {
@@ -49,24 +48,37 @@ public class ZWavePoller extends Thread
 	// the poller logger
 	private LogHelper logger;
 
-	// the log identifier, unique for the class
-	public static String logId = "[ZWavePoller]: ";
-	
-	// set of device to trigger for update
-	public Set<TriggerElem> deviceSet = Collections.newSetFromMap(new ConcurrentHashMap<TriggerElem, Boolean>());
-	//public ConcurrentHashMap<Integer,TriggerElem> deviceSet = new ConcurrentHashMap<Integer,TriggerElem>();
+	// the polling time to use
+	private int pollingTimeMillis;
 
-	public ZWavePoller(ZWaveNetworkHandlerImpl zWaveNetworkHandler)
-	{		
+	// set of device to trigger for update
+	public Set<TriggerElem> deviceSet = Collections
+			.newSetFromMap(new ConcurrentHashMap<TriggerElem, Boolean>());
+
+	/**
+	 * The Class constructor, takes as a reference a {@link ZWaveNetworkHandler}
+	 * instance to which reporting the polling results.
+	 * 
+	 * @param zWaveNetworkHandler
+	 *            The {@link ZWaveNetworkHandler} to which polling results shall
+	 *            be reported.
+	 */
+	public ZWavePoller(ZWaveNetworkHandlerImpl zWaveNetworkHandler,
+			int pollingTimeMillis)
+	{
 		// store a reference to the poller driver
 		this.driver = zWaveNetworkHandler;
+
+		// store the polling time in millis
+		this.pollingTimeMillis = pollingTimeMillis;
 
 		// init the logger
 		this.logger = this.driver.getLogger();
 	}
 
-
-	/* (non-Javadoc)
+	/*
+	 * (non-Javadoc)
+	 * 
 	 * @see java.lang.Thread#run()
 	 */
 	@Override
@@ -76,37 +88,44 @@ public class ZWavePoller extends Thread
 		while (this.runnable)
 		{
 			// log
-			this.logger.log(LogService.LOG_DEBUG, ZWavePoller.logId + "Starting a new polling cycle...");
+			this.logger.log(LogService.LOG_DEBUG,
+					"Starting a new polling cycle...");
 
+			// get the current time (WARNING: Locale is not considered here)
 			Date currentDate = new Date();
-			
-			//for each driver registered
-			for(TriggerElem elem : deviceSet)
+
+			// for each driver registered
+			for (TriggerElem elem : deviceSet)
 			{
-				//if its triggerTime is already past
-				if(elem.getTriggerTime() <= currentDate.getTime())
+				// if its triggerTime is already past
+				if (elem.getTriggerTime() <= currentDate.getTime())
 				{
-					//trigger device
+					// trigger direct device query on the ZWave network, this
+					// might "overload" the underlying network.
 					this.driver.updateSensor(elem.getNodeInfo());
-					//update value for next trigger
-					elem.setTriggerTime(elem.getTriggerTime() + elem.getUpdateTimeMillis());
-					
-					//yield to other processes
+					// update value for next trigger
+					elem.setTriggerTime(
+							elem.getTriggerTime() + elem.getUpdateTimeMillis());
+
+					// yield to other processes
 					Thread.yield();
 				}
 			}
-			
+
+			// get the latest value from the ZWave network
 			this.driver.readAll(true);
 
-			// ok now the polling cycle has ended and the poller can sleep for the given polling time
+			// ok now the polling cycle has ended and the poller can sleep for
+			// the given polling time
 			try
 			{
-				Thread.sleep(this.driver.getPollingTimeMillis());
+				Thread.sleep(this.pollingTimeMillis);
 			}
 			catch (InterruptedException e)
 			{
 				// log the error
-				this.logger.log(LogService.LOG_WARNING, ZWavePoller.logId + "Interrupted exception: " + e);
+				this.logger.log(LogService.LOG_WARNING,
+						"Interrupted exception: " + e);
 			}
 
 		}
@@ -114,7 +133,6 @@ public class ZWavePoller extends Thread
 		// auto-reset the state at runnable...
 		this.runnable = true;
 	}
-
 
 	/**
 	 * Sets the thread state at runnable (true) or not runnable(false)
@@ -125,107 +143,142 @@ public class ZWavePoller extends Thread
 	{
 		this.runnable = runnable;
 	}
-	
 
 	/**
 	 * Call this method to add a device to the queue of the thread.
-	 * @param nodeInfo {@link ZWaveNodeInfo} representing the node
-	 * @param updateTimeMillis how much the device must be triggered for a full update. 0 means no trigger for this node
+	 * 
+	 * @param nodeInfo
+	 *            {@link ZWaveNodeInfo} representing the node
+	 * @param updateTimeMillis
+	 *            how much the device must be triggered for a full update. 0
+	 *            means no trigger for this node
 	 */
 	public void addDeviceToQueue(ZWaveNodeInfo nodeInfo, int updateTimeMillis)
 	{
-		//if updateTimeMillis = 0, the device doesn't need trigger update
-		if(updateTimeMillis <= 0)
+		// if updateTimeMillis = 0, the device doesn't need trigger update
+		if (updateTimeMillis <= 0)
 			return;
-		
-		//min value allowed for updateTimeMillis is equals to driver.getPollingTimeMillis()
-		if(updateTimeMillis < this.driver.getPollingTimeMillis())
+
+		// min value allowed for updateTimeMillis is equals to
+		// driver.getPollingTimeMillis()
+		if (updateTimeMillis < this.pollingTimeMillis)
 		{
-			this.logger.log(LogService.LOG_WARNING, ZWavePoller.logId + "Min value allowed for device.'updateTimeMillis' is equals to network.'pollingTimeMillis'");
-			updateTimeMillis = (int) this.driver.getPollingTimeMillis();
+			this.logger.log(LogService.LOG_WARNING,
+					"Min value allowed for device.'updateTimeMillis' is equals to network.'pollingTimeMillis'");
+			updateTimeMillis = this.pollingTimeMillis;
 		}
-		
+
 		Date date = new Date();
-		TriggerElem elem = new TriggerElem(nodeInfo, date.getTime()+updateTimeMillis, updateTimeMillis);
+		TriggerElem elem = new TriggerElem(nodeInfo,
+				date.getTime() + updateTimeMillis, updateTimeMillis);
 		deviceSet.add(elem);
 	}
-	
+
 	/**
 	 * Call this method to remove a device to the queue of the thread.
-	 * @param nodeInfo {@link ZWaveNodeInfo} representing the node
-	 * @param updateTimeMillis how much the device must be triggered for a full update. 0 means no trigger for this node
+	 * 
+	 * @param nodeInfo
+	 *            {@link ZWaveNodeInfo} representing the node
+	 * @param updateTimeMillis
+	 *            how much the device must be triggered for a full update. 0
+	 *            means no trigger for this node
 	 */
 	public void removeDeviceFromQueue(int nodeId)
 	{
-		//the list of triggers to remove
+		// the list of triggers to remove
 		ArrayList<TriggerElem> toRemove = new ArrayList<TriggerElem>();
-		
-		//build the list of triggers to remove
-		for(TriggerElem elem : this.deviceSet)
-			if(elem.getNodeInfo().getDeviceNodeId() == nodeId)
+
+		// build the list of triggers to remove
+		for (TriggerElem elem : this.deviceSet)
+			if (elem.getNodeInfo().getDeviceNodeId() == nodeId)
 				toRemove.add(elem);
-		//remove
-		for(TriggerElem elem : toRemove)
+		// remove
+		for (TriggerElem elem : toRemove)
 			this.deviceSet.remove(elem);
 	}
-	
+
+	/**
+	 * Setter for the polling time, allows dynamic change of polling time, while
+	 * the thread is running.
+	 * 
+	 * @param pollingTimeMillis
+	 *            The updated polling time in millis.
+	 */
+	public void setPollingTimeMillis(int pollingTimeMillis)
+	{
+		if (pollingTimeMillis > 0)
+		{
+			this.pollingTimeMillis = pollingTimeMillis;
+		}
+	}
+
 	public class TriggerElem
 	{
-		//how often trigger the node
+		// how often trigger the node
 		protected int updateTimeMillis;
-		
-		//timestamp for next trigger
+
+		// timestamp for next trigger
 		protected long triggerTime;
-		
-		//nodeInfo representing the node to trigger
+
+		// nodeInfo representing the node to trigger
 		protected ZWaveNodeInfo nodeInfo;
-		
-		public TriggerElem(ZWaveNodeInfo nodeInfo, long triggerTime, int updateTimeMillis) 
+
+		public TriggerElem(ZWaveNodeInfo nodeInfo, long triggerTime,
+				int updateTimeMillis)
 		{
 			this.nodeInfo = nodeInfo;
 			this.triggerTime = triggerTime;
 			this.updateTimeMillis = updateTimeMillis;
 		}
-		
+
 		/**
 		 * @return the triggerTime
 		 */
-		public long getTriggerTime() {
+		public long getTriggerTime()
+		{
 			return triggerTime;
 		}
 
 		/**
-		 * @param triggerTime the triggerTime to set
+		 * @param triggerTime
+		 *            the triggerTime to set
 		 */
-		public void setTriggerTime(long triggerTime) {
+		public void setTriggerTime(long triggerTime)
+		{
 			this.triggerTime = triggerTime;
 		}
 
 		/**
 		 * @return the nodeInfo
 		 */
-		public ZWaveNodeInfo getNodeInfo() {
+		public ZWaveNodeInfo getNodeInfo()
+		{
 			return nodeInfo;
 		}
 
 		/**
-		 * @param nodeInfo the nodeInfo to set
+		 * @param nodeInfo
+		 *            the nodeInfo to set
 		 */
-		public void setNodeInfo(ZWaveNodeInfo nodeInfo) {
+		public void setNodeInfo(ZWaveNodeInfo nodeInfo)
+		{
 			this.nodeInfo = nodeInfo;
 		}
 
 		/**
 		 * @return the updateTimeMillis
 		 */
-		public int getUpdateTimeMillis() {
+		public int getUpdateTimeMillis()
+		{
 			return updateTimeMillis;
 		}
 
 		/**
-		 * @param updateTimeMillis the updateTimeMillis to set
+		 * @param updateTimeMillis
+		 *            the updateTimeMillis to set
 		 */
-		public void setUpdateTimeMillis(int updateTimeMillis) {
+		public void setUpdateTimeMillis(int updateTimeMillis)
+		{
 			this.updateTimeMillis = updateTimeMillis;
 		}
 	}

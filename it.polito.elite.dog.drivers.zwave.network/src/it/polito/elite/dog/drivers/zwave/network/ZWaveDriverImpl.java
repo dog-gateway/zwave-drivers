@@ -38,6 +38,9 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 	// the update time millis configuration parameter
 	public static String POLLING_TIME_MILLIS_CONFIG = "pollingTimeMillis";
 
+	// the discovery configuration parameter
+	public static String AUTO_DISCOVERY = "autoDiscovery";
+
 	// ----------------------------------------------------------
 	// the log identifier, unique for the class
 	public static String LOG_ID = "[ZWaveDriverImpl]: ";
@@ -51,8 +54,11 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 	// the driver logger
 	private LogHelper logger;
 
-	// the baseline pollingTime adopted if no server-specific setting is given
-	private int pollingTimeMillis = 5000; // default value
+	// the baseline pollingTime
+	private int pollingTimeMillis;
+
+	// the auto-discovery flag, true by default
+	private boolean autoDiscovery;
 
 	// the ZWaveNetworkHandler Map indexed by gateway URI (device id)
 	private ConcurrentHashMap<String, ZWaveNetworkHandlerImpl> handlers;
@@ -61,8 +67,14 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 	{
 		// initialize the zwave handlers map
 		this.handlers = new ConcurrentHashMap<String, ZWaveNetworkHandlerImpl>();
+
+		// set the autodiscovery initially at true
+		this.autoDiscovery = true;
 	}
 
+	/*
+	 * TODO: handle dynamic update of configuration parameters
+	 */
 	@Override
 	public void updated(Dictionary<String, ?> properties)
 			throws ConfigurationException
@@ -84,8 +96,56 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 			if (pollingTimeAsString != null)
 			{
 				// parse the string
-				pollingTimeMillis = Integer.valueOf(pollingTimeAsString);
+				int newPollingTimeMillis = Integer.valueOf(pollingTimeAsString);
+
+				if (newPollingTimeMillis != this.pollingTimeMillis)
+				{
+					// store the new value
+					this.pollingTimeMillis = newPollingTimeMillis;
+
+					// avoid useless calls
+					if ((this.handlers != null) && (!this.handlers.isEmpty()))
+					{
+						// Prepare an asynchronous task to update the handlers
+						// (Such
+						// an updated is done in a separate
+						// thread as per OSGi specs, this method shall return as
+						// quickly as possible)
+						Thread updatePollingTimeThread = new Thread(
+								new Runnable()
+								{
+
+									@Override
+									public void run()
+									{
+										for (ZWaveNetworkHandler handler : handlers
+												.values())
+										{
+											handler.setPollingTime(
+													pollingTimeMillis);
+										}
+
+									}
+								});
+
+						// spawn the worker thread
+						updatePollingTimeThread.start();
+					}
+				}
 			}
+
+			// try to get the autodiscovery flag
+			String autoDiscoveryAsString = (String) properties
+					.get(ZWaveDriverImpl.AUTO_DISCOVERY);
+
+			// check not null
+			if (autoDiscoveryAsString != null)
+			{
+				// parse the string
+				this.autoDiscovery = Boolean.valueOf(autoDiscoveryAsString);
+			}
+
+			// TODO: handle run-time change of the auto-discovery flag
 
 			// register the driver service if not already registered
 			if (regServiceZWaveDriverImpl == null)
@@ -153,7 +213,8 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 				this.handlers.put(nodeInfo.getAdapterEndpoint(),
 						new ZWaveNetworkHandlerImpl(
 								nodeInfo.getAdapterEndpoint(), username,
-								password, this.pollingTimeMillis, this.logger));
+								password, this.pollingTimeMillis,
+								this.autoDiscovery, this.logger));
 			}
 		}
 		// get the network handler
