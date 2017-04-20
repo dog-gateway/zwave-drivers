@@ -3,10 +3,13 @@
  */
 package it.polito.elite.dog.drivers.zwave.network;
 
+import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.osgi.framework.Version;
 import org.osgi.service.log.LogService;
@@ -18,9 +21,11 @@ import it.polito.elite.dog.drivers.zwave.model.zway.json.Controller;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.Device;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.Instance;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.ZWaveModelTree;
-import it.polito.elite.dog.drivers.zwave.network.info.ZWaveInfo;
 import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
+import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveDiscoveryListener;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
+import it.polito.elite.dog.drivers.zwave.network.tasks.NotifyNotExistingDeviceTask;
+import it.polito.elite.dog.drivers.zwave.network.tasks.NotifyUnknownDeviceTask;
 import it.polito.elite.dog.drivers.zwave.util.ConnectionManager;
 
 /**
@@ -36,7 +41,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 {
 	// the default polling time
 	public static final int DEFAULT_POLLING_TIME_MILLIS = 5000;
-	
+
 	// the URL of the pseudo-REST end point of the Z-Way server
 	private String gatewayEndpointURL;
 
@@ -68,15 +73,26 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 	private ZWavePoller poller;
 
 	// the baseline pollingTime adopted if no server-specific setting is given
-	private int pollingTimeMillis = ZWaveNetworkHandlerImpl.DEFAULT_POLLING_TIME_MILLIS; 
+	private int pollingTimeMillis = ZWaveNetworkHandlerImpl.DEFAULT_POLLING_TIME_MILLIS;
 
+	// the autoDiscovery flag
+	private boolean autoDiscovery;
+
+	// Version information to handle the version patch
 	private Version version;
+
+	// the auto-discovery listener
+	private Set<ZWaveDiscoveryListener> discoveryListeners;
+
+	// the notification executor service
+	private ExecutorService deviceNotificationService;
 
 	/**
 	 * 
 	 */
 	public ZWaveNetworkHandlerImpl(String gatewayEndpointURL, String username,
-			String password, int pollingTimeMillis, LogHelper logger)
+			String password, int pollingTimeMillis, boolean autoDiscovery,
+			LogHelper logger)
 	{
 		// TODO add checks for needed values
 		// store the instance variables
@@ -84,7 +100,14 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 		this.username = username; // the username to access the gateway
 		this.password = password; // the password to access the gateway
 		this.pollingTimeMillis = pollingTimeMillis; // the polling time to use
+		this.autoDiscovery = autoDiscovery; // the auto-discovery flag
 		this.logger = logger; // the logger to provide information when needed
+		this.discoveryListeners = new HashSet<ZWaveDiscoveryListener>();
+
+		// the notification service for unknown devices
+		// TODO: check whether a single thread working off an unbounded queue is
+		// sufficient
+		this.deviceNotificationService = Executors.newSingleThreadExecutor();
 
 		/*--- Bi-directional hash map, naive implementation ----*/
 
@@ -97,16 +120,15 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 		/*---- Physical connection handler ----*/
 
 		// Create a connection manager and try to connect to the server
-		conManager = new ConnectionManager(this.gatewayEndpointURL,
+		this.conManager = new ConnectionManager(this.gatewayEndpointURL,
 				this.username, this.password, this.logger);
 
 		// do not start the Poller if already existing
 		if (this.poller == null)
 		{
 			// in any case, as the polling time has a default, init the
-			// poller
-			// thread and start it
-			poller = new ZWavePoller(this);
+			// poller thread and start it
+			poller = new ZWavePoller(this, this.pollingTimeMillis);
 
 			// start the poller
 			poller.start();
@@ -148,13 +170,16 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 	 */
 	public void read(ZWaveNodeInfo nodeInfo, boolean bRequery)
 	{
-		if (conManager != null)
+		if (this.conManager != null)
 		{
 			try
 			{
 				// if needed update tree model
-				if (bRequery || modelTree == null)
-					modelTree = conManager.updateDevices();
+				// read can directly be called with a model tree that needs
+				// updates,
+				// in such a case, first update the tree, then perform the read
+				if (bRequery || this.modelTree == null)
+					this.modelTree = this.conManager.updateDevices();
 
 				Device deviceNode = null;
 				Instance instanceNode = null;
@@ -163,11 +188,11 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 				// if node is the controller (gateway) we have to put also
 				// controller data.
 				if (nodeInfo.isController())
-					controllerNode = modelTree.getController();
+					controllerNode = this.modelTree.getController();
 
-				deviceNode = modelTree.getDevices()
+				deviceNode = this.modelTree.getDevices()
 						.get(nodeInfo.getDeviceNodeId());
-				Device device = modelTree.getDevices()
+				Device device = this.modelTree.getDevices()
 						.get(nodeInfo.getDeviceNodeId());
 				// device can be null if house xml configuration is wrong
 				if (device != null)
@@ -187,16 +212,15 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 						}
 						else
 						{
+							// in this case the device is configured in dog, but
+							// it is no more available on the zwave network,
+							// therefore it should be removed.
 							logger.log(LogService.LOG_ERROR,
 									"Device id: " + nodeInfo.getDeviceNodeId()
 											+ " instance id: " + instanceId
 											+ " does not exists!");
-							
-							// here auto discovery takes place:
-							if(controllerNode==null)
-							{
-								//get the controller device and trigger auto-discovery
-							}
+
+							// TODO: implement device removal here
 						}
 					}
 				}
@@ -216,13 +240,27 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 
 	public void readAll(boolean bRequery)
 	{
-		if (conManager != null)
+		// read only if a connection to the physical ZWay server is available.
+		if (this.conManager != null)
 		{
 			try
 			{
 				// if needed update tree model
-				if (bRequery || modelTree == null)
-					modelTree = conManager.updateDevices();
+				if (bRequery || this.modelTree == null)
+				{
+					// query the ZWay server to get the latest updates
+					// can throw an exception if something on the connection
+					// goes wrong.
+					this.modelTree = this.conManager.updateDevices();
+
+					// this shall be done only on zwave network query, otherwise
+					// no change will be detected
+					// TODO: this can generate some fluctuating behavior when,
+					// for example, connection to the gateway is lost. Shall not
+					// be called in such a case.
+					if (this.autoDiscovery)
+						this.zWaveNetworkSync();
+				}
 
 				// if version still not available
 				if (this.version == null)
@@ -236,12 +274,15 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 							"ZWay version:" + this.version);
 				}
 
+				// read information about all the configured devices, i.e., all
+				// devices already present in the current Dog configuration
 				for (ZWaveNodeInfo nodeInfo : driver2NodeInfo.values())
 				{
 					read(nodeInfo, false);
 					// yield to other processes
 					Thread.yield();
 				}
+
 			}
 			catch (Exception e)
 			{
@@ -269,10 +310,10 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 						// cases device removal at the z-wave network-level may
 						// happen before than the time in which the gateway
 						// driver detects it.
-						if (modelTree.getDevices()
+						if (this.modelTree.getDevices()
 								.containsKey(nodeInfo.getDeviceNodeId()))
 						{
-							conManager.sendCommand("devices["
+							this.conManager.sendCommand("devices["
 									+ nodeInfo.getDeviceNodeId()
 									+ "].instances[" + instanceCC.getKey()
 									+ "].commandClasses[" + ccToTrigger
@@ -306,8 +347,8 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 		Set<Integer> lstInstanceNodeId = nodeInfo.getInstanceSet();
 
 		// info on port usage
-		logger.log(LogService.LOG_INFO,"Using deviceId: " + deviceNodeId + " instancesId: "
-						+ lstInstanceNodeId.toString());
+		logger.log(LogService.LOG_INFO, "Using deviceId: " + deviceNodeId
+				+ " instancesId: " + lstInstanceNodeId.toString());
 
 		// adds a given register-driver association
 		nodeInfo2Driver.put(nodeInfo, driver);
@@ -409,7 +450,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 				}
 			}
 
-			conManager.sendCommand("devices[" + deviceId + "].instances["
+			this.conManager.sendCommand("devices[" + deviceId + "].instances["
 					+ instanceId + "].commandClasses[" + nCommandClass
 					+ "].Set(" + commandValue + ")");
 		}
@@ -425,7 +466,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 	{
 		try
 		{
-			conManager.sendCommand(sCommand + "(" + commandValue + ")");
+			this.conManager.sendCommand(sCommand + "(" + commandValue + ")");
 		}
 		catch (Exception e)
 		{
@@ -433,7 +474,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 
 		}
 	}
-	
+
 	/**
 	 * Get all devices currently available on the network, including devices
 	 * that still have to be configured in Dog
@@ -485,5 +526,140 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 		return deviceId;
 	}
 
+	@Override
+	public boolean addZWaveDiscoveryListener(ZWaveDiscoveryListener listener)
+	{
+		boolean added = false;
+		// add the listener to the set of listeners to be notified if any new or
+		// missing device is detected
+		if ((listener != null) && (this.autoDiscovery))
+		{
+			added = this.discoveryListeners.add(listener);
+		}
 
+		return added;
+	}
+
+	@Override
+	public boolean removeZWaveDiscoveryListener(ZWaveDiscoveryListener listener)
+	{
+		// initially not removed
+		boolean removed = false;
+
+		// remove the listener from the set of listeners to be notified about
+		// new or missing devices.
+		if ((listener != null) && (this.autoDiscovery))
+		{
+			// remove and store the removal result
+			removed = this.discoveryListeners.remove(listener);
+		}
+
+		return removed;
+	}
+
+	@Override
+	public void setPollingTime(int pollingTimeMillis)
+	{
+		// check the polling time
+		if (pollingTimeMillis > 0)
+		{
+			if (pollingTimeMillis != this.pollingTimeMillis)
+			{
+				// store the polling time
+				this.pollingTimeMillis = pollingTimeMillis;
+
+				// update the ZWave poller
+				this.poller.setPollingTimeMillis(this.pollingTimeMillis);
+			}
+		}
+
+	}
+
+	private void zWaveNetworkSync()
+	{
+		// identify devices not present in the configuration
+		Set<ZWaveNodeInfo> unknownDevices = this.findUnknownDevices();
+
+		// notify the listener for discovered devices, notification is
+		// asynchronous to avoid inserting delays / blocking sections in
+		// the read method.
+		for (ZWaveNodeInfo unknownDevice : unknownDevices)
+		{
+			int nodeId = unknownDevice.getDeviceNodeId();
+			this.deviceNotificationService
+					.submit(new NotifyUnknownDeviceTask(this.discoveryListeners,
+							this.getRawDevice(nodeId), nodeId));
+		}
+
+		// identify devices not present at the ZWave network level
+		Set<ZWaveNodeInfo> knownButNotPresent = this.findNotExistingDevices();
+
+		// notify the listener for not existing devices, notification is
+		// asynchronous to avoid inserting delays / blocking sections in
+		// the read method.
+		for (ZWaveNodeInfo notExistingDevice : knownButNotPresent)
+		{
+			int nodeId = notExistingDevice.getDeviceNodeId();
+			this.deviceNotificationService.submit(
+					new NotifyNotExistingDeviceTask(this.discoveryListeners,
+							this.getRawDevice(nodeId), nodeId));
+		}
+
+	}
+
+	private Set<ZWaveNodeInfo> findUnknownDevices()
+	{
+		// prepare the set of unknown devices
+		HashSet<ZWaveNodeInfo> unknownDevices = new HashSet<>();
+
+		// get all the devices in the current model tree
+		Map<Integer, Device> allDevices = this.modelTree.getDevices();
+
+		// iterate over the keys
+		for (Integer nodeId : allDevices.keySet())
+		{
+			// build a ZWaveNodeInfo representing the device
+			// TODO check how a node info is usually created and if it is worth
+			// creating it here
+			ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(this.gatewayEndpointURL,
+					nodeId, null, false);
+
+			// check if the node info is in the set of configured devices
+			if (!this.nodeInfo2Driver.containsKey(nodeInfo))
+			{
+				// the node is not yet configured and should be discovered
+				unknownDevices.add(nodeInfo);
+			}
+		}
+		return unknownDevices;
+	}
+
+	private Set<ZWaveNodeInfo> findNotExistingDevices()
+	{
+		// prepare the set of devices that drivers have "added" to the set of
+		// devices to be polled by this handler, but that do not exist at the
+		// ZWave network level. If any of these devices are found, then there is
+		// likely some misalignment between the Dog environment configuration
+		// and the actual ZWave network.
+		Set<ZWaveNodeInfo> notExistingDevices = new HashSet<ZWaveNodeInfo>();
+
+		// the set of devices currently "visible" at the ZWave network level
+		Map<Integer, Device> deviceAtZwaveNetwork = this.modelTree.getDevices();
+
+		// iterate over all "registered devices"
+		for (ZWaveNodeInfo device : this.nodeInfo2Driver.keySet())
+		{
+			// search for the device in the model tree
+			if (!deviceAtZwaveNetwork.containsKey(device.getDeviceNodeId()))
+			{
+				// the device is not "known" at the ZWave network and therefore
+				// shall be collected for potential removal.
+				notExistingDevices.add(device);
+			}
+		}
+
+		// return the set of devices that are not existing at the zwave network,
+		// or null if no unknown devices are found.
+		return notExistingDevices;
+	}
 }

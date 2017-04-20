@@ -39,6 +39,7 @@ import it.polito.elite.dog.drivers.zwave.model.zway.json.Instance;
 import it.polito.elite.dog.drivers.zwave.network.ZWaveDriverInstance;
 import it.polito.elite.dog.drivers.zwave.network.info.ZWaveInfo;
 import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
+import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveDiscoveryListener;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
 
@@ -52,7 +53,7 @@ import org.osgi.framework.BundleContext;
 import org.osgi.service.log.LogService;
 
 public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
-		implements ZWaveGateway
+		implements ZWaveGateway, ZWaveDiscoveryListener
 {
 	// the driver logger
 	LogHelper logger;
@@ -126,51 +127,6 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 
 		// initialize device states
 		this.initializeStates();
-	}
-
-	/**
-	 * Updates the inner state accordingly to the given State instance and
-	 * triggers a device state update
-	 * 
-	 * @param newState
-	 *            The new State instance to update the inner state
-	 */
-	private boolean changeState(State newState)
-	{
-		// the state changed flag
-		boolean stateChanged = false;
-
-		// get the current state
-		String currentStateValue = "";
-		State state = currentState
-				.getState(DeviceAssociationState.class.getSimpleName());
-
-		if (state != null)
-			currentStateValue = (String) state.getCurrentStateValue()[0]
-					.getValue();
-
-		// check that the state has changed
-		if (!currentStateValue
-				.equals(newState.getCurrentStateValue()[0].getValue()))
-		{
-			// update the current state
-			this.currentState.setState(
-					DeviceAssociationState.class.getSimpleName(), newState);
-
-			// debug
-			logger.log(LogService.LOG_DEBUG,
-					ZWaveGatewayDriverInstance.LOG_ID + "Device "
-							+ device.getDeviceId() + " is now "
-							+ (newState).getCurrentStateValue()[0].getValue());
-
-			// update the status
-			this.updateStatus();
-
-			// updated the state changed flag
-			stateChanged = true;
-		}
-
-		return stateChanged;
 	}
 
 	/**
@@ -282,8 +238,8 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 				// store the gateway enpoint (ipaddress:port)
 				this.gatewayEndpoint = ip + ":" + ZWaveInfo.DEFAULT_PORT;
 			}
-			
-			//update the gateway node info
+
+			// update the gateway node info
 			this.nodeInfo.setAdapterEndpoint(this.gatewayEndpoint);
 		}
 
@@ -292,16 +248,23 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 	@Override
 	protected ZWaveNetworkHandler addToNetworkDriver(ZWaveNodeInfo nodeInfo)
 	{
-		return network.addDriver(nodeInfo, 0, this, this.username, this.password);
+		// generate a new network handler for thge gateway represented by this
+		// driver
+		ZWaveNetworkHandler zwHandler = network.addDriver(nodeInfo, 0, this,
+				this.username, this.password);
+		// register the driver as a listener for ZWNetwork changes
+		zwHandler.addZWaveDiscoveryListener(this);
+		
+		//return the create ZWaveNetwork handler
+		return zwHandler;
 	}
 
 	@Override
 	public void newMessageFromHouse(Device deviceNode, Instance instanceNode,
 			Controller controllerNode, String sValue)
 	{
-		this.deviceNode = deviceNode;
-		controller = controllerNode;
-
+		this.controller = controllerNode;
+		
 		/*-------------- HANDLE ASSOCIATION ------------------------*/
 		// check if dynamic device detection is enabled
 		if (detectionEnabled)
@@ -501,6 +464,118 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 		this.waitBeforeDeviceInstall = waitBeforeDeviceInstall;
 	}
 
+	@Override
+	public void notifyAssociating()
+	{
+		((ZWaveGateway) this.device).notifyAssociating();
+	}
+
+	@Override
+	public void notifyDisassociating()
+	{
+		((ZWaveGateway) this.device).notifyDisassociating();
+	}
+
+	@Override
+	public void notifyIdle()
+	{
+		((ZWaveGateway) this.device).notifyIdle();
+	}
+
+	@Override
+	public void updateStatus()
+	{
+		// update the monitor admin status snapshot
+		((Controllable) this.device).updateStatus();
+	}
+
+	public String getGatewayEndpoint()
+	{
+		return this.gatewayEndpoint;
+	}
+
+	/**
+	 * @return the password
+	 */
+	public String getPassword()
+	{
+		return password;
+	}
+
+	/**
+	 * @return the username
+	 */
+	public String getUsername()
+	{
+		return username;
+	}
+
+	@Override
+	public void detectedUnknownZWaveDevice(Device discoveredDevice, int nodeId)
+	{
+		// discovery is enabled only when not handling the device
+		// association/disassociation
+		if (this.isGatewayIdle() && !detectionEnabled)
+		{
+			// avoid any discovery during the associating / disassociating state
+
+			// build the device descriptor
+			DeviceDescriptor descriptorToAdd = this
+					.buildDeviceDescriptor(discoveredDevice, nodeId);
+
+			// check not null
+			if (descriptorToAdd != null)
+			{
+				// create the device
+				// cross the finger
+				this.deviceFactory.addNewDevice(descriptorToAdd);
+			}
+
+		}
+
+	}
+
+	@Override
+	public void detectedNotExistingZWaveDevice(Device notExistingDevice,
+			int nodeId)
+	{
+		// device auto-removal is only enabled when the gateway is idle and not
+		// handling association and/or disassociation
+		if (this.isGatewayIdle() && !detectionEnabled)
+		{
+			// TODO: find a better solution to removal as this one is very weak.
+			// It only works assuming the the device URI is generated based on
+			// the node id and it has not been changed by the user. A better
+			// option would be to search for zwave devices mapped on the given
+			// node id.
+			// TODO: another issue is how to handle wrongly configured device
+			// types, i.e., devices that were preously configured in dog,
+			// referring to a certain node id when the same id is assigned to a
+			// different device. this is the case when, for example the ZWay
+			// server used by dog is changed without cleaning the configuration.
+			String deviceUrl = this.handler
+					.getControllableDeviceURIFromNodeId(nodeId);
+			this.deviceFactory.removeDevice(deviceUrl);
+		}
+
+	}
+
+	private boolean isGatewayIdle()
+	{
+		// the idle flag, initially false
+		boolean idle = false;
+		// the current association state for this gateway
+		State currentAssociationState = this.currentState
+				.getState(DeviceAssociationState.class.getSimpleName());
+		// check if idle
+		if ((currentAssociationState != null)
+				&& (currentAssociationState.getCurrentStateValue()[0].getClass()
+						.getName().equals(IdleStateValue.class.getName())))
+			idle = true;
+		// return the idel state
+		return idle;
+	}
+
 	// TODO: implement better.... just a trial
 	private DeviceDescriptor buildDeviceDescriptor(Device device, int nodeId)
 	{
@@ -537,8 +612,8 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 			}
 
 			// build the 4th id (number of instances)
-			int numberOfInstances = this.handler.getRawDevice(nodeId).getInstances()
-					.size();
+			int numberOfInstances = this.handler.getRawDevice(nodeId)
+					.getInstances().size();
 
 			// build the device unique id
 			String extendedDeviceUniqueId = manufacturerId + "-"
@@ -565,7 +640,9 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 
 				// store the device name
 				descriptorDefinitionData.put(DeviceDescriptorFactory.NAME,
-						UUID.nameUUIDFromBytes(((this.gatewayEndpoint+"_"+deviceClass + "_" + nodeId)).getBytes()).toString());
+						UUID.nameUUIDFromBytes(((this.gatewayEndpoint + "_"
+								+ deviceClass + "_" + nodeId)).getBytes())
+								.toString());
 
 				// store the device description
 				descriptorDefinitionData.put(
@@ -646,50 +723,49 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 
 	}
 
-	@Override
-	public void notifyAssociating()
-	{
-		((ZWaveGateway) this.device).notifyAssociating();
-	}
-
-	@Override
-	public void notifyDisassociating()
-	{
-		((ZWaveGateway) this.device).notifyDisassociating();
-	}
-
-	@Override
-	public void notifyIdle()
-	{
-		((ZWaveGateway) this.device).notifyIdle();
-	}
-
-	@Override
-	public void updateStatus()
-	{
-		// update the monitor admin status snapshot
-		((Controllable) this.device).updateStatus();
-	}
-
-	public String getGatewayEndpoint()
-	{
-		return this.gatewayEndpoint;
-	}
-
 	/**
-	 * @return the password
+	 * Updates the inner state accordingly to the given State instance and
+	 * triggers a device state update
+	 * 
+	 * @param newState
+	 *            The new State instance to update the inner state
 	 */
-	public String getPassword()
+	private boolean changeState(State newState)
 	{
-		return password;
-	}
+		// the state changed flag
+		boolean stateChanged = false;
 
-	/**
-	 * @return the username
-	 */
-	public String getUsername()
-	{
-		return username;
+		// get the current state
+		String currentStateValue = "";
+		State state = currentState
+				.getState(DeviceAssociationState.class.getSimpleName());
+
+		if (state != null)
+			currentStateValue = (String) state.getCurrentStateValue()[0]
+					.getValue();
+
+		// check that the state has changed
+		if (!currentStateValue
+				.equals(newState.getCurrentStateValue()[0].getValue()))
+		{
+			// update the current state
+			this.currentState.setState(
+					DeviceAssociationState.class.getSimpleName(), newState);
+
+			// debug
+			logger.log(LogService.LOG_DEBUG,
+					ZWaveGatewayDriverInstance.LOG_ID + "Device "
+							+ device.getDeviceId() + " is now "
+							+ (newState).getCurrentStateValue()[0].getValue());
+
+			// update the status
+			this.updateStatus();
+
+			// updated the state changed flag
+			stateChanged = true;
+		}
+
+		return stateChanged;
 	}
 
 }

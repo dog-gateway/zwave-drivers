@@ -151,4 +151,27 @@ public interface ZWaveNetworkHandler
 	 * @return
 	 */
 	public long getPollingTimeMillis();
+
+	/**
+	 * Adds a listener for events regarding discovery of unknown or not existing
+	 * devices in the ZWave network.
+	 * 
+	 * @param listener
+	 *            the listener to be notified about device discovery events
+	 */
+	public boolean addZWaveDiscoveryListener(ZWaveDiscoveryListener listener);
+
+	/**
+	 * Removes a listener from the set set of listeners notified about events
+	 * regarding discovery of unknown or not existing devices in the ZWave
+	 * network.
+	 * 
+	 * @param listener
+	 *            The listener to be removed.
+	 * @return true if removed, false otherwise.
+	 */
+	public boolean removeZWaveDiscoveryListener(
+			ZWaveDiscoveryListener listener);
+
+	public void setPollingTime(int pollingTimeMillis);
 }
