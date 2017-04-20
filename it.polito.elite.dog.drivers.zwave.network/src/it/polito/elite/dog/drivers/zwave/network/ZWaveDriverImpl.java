@@ -69,7 +69,7 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 		this.handlers = new ConcurrentHashMap<String, ZWaveNetworkHandlerImpl>();
 
 		// set the autodiscovery initially at true
-		this.autoDiscovery = true;
+		this.autoDiscovery = false;
 	}
 
 	/*
