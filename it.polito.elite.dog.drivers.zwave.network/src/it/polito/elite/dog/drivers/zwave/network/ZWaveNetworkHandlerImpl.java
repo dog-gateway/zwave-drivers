@@ -102,6 +102,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 		this.pollingTimeMillis = pollingTimeMillis; // the polling time to use
 		this.autoDiscovery = autoDiscovery; // the auto-discovery flag
 		this.logger = logger; // the logger to provide information when needed
+		this.discoveryListeners = new HashSet<ZWaveDiscoveryListener>();
 
 		// the notification service for unknown devices
 		// TODO: check whether a single thread working off an unbounded queue is
@@ -624,7 +625,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 					nodeId, null, false);
 
 			// check if the node info is in the set of configured devices
-			if (!this.nodeInfo2Driver.contains(nodeInfo))
+			if (!this.nodeInfo2Driver.containsKey(nodeInfo))
 			{
 				// the node is not yet configured and should be discovered
 				unknownDevices.add(nodeInfo);
@@ -659,6 +660,6 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 
 		// return the set of devices that are not existing at the zwave network,
 		// or null if no unknown devices are found.
-		return notExistingDevices.isEmpty() ? null : notExistingDevices;
+		return notExistingDevices;
 	}
 }

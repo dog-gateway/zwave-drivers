@@ -263,6 +263,8 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 	public void newMessageFromHouse(Device deviceNode, Instance instanceNode,
 			Controller controllerNode, String sValue)
 	{
+		this.controller = controllerNode;
+		
 		/*-------------- HANDLE ASSOCIATION ------------------------*/
 		// check if dynamic device detection is enabled
 		if (detectionEnabled)

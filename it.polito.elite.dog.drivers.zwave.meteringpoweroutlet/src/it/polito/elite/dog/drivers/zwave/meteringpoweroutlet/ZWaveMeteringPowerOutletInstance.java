@@ -117,8 +117,8 @@ public class ZWaveMeteringPowerOutletInstance extends ZWaveDriverInstance
 		this.currentState.setState(
 				SinglePhaseActiveEnergyState.class.getSimpleName(),
 
-				new SinglePhaseActiveEnergyState(new StateValue[]{energyStateValue}));
-
+				new SinglePhaseActiveEnergyState(
+						new StateValue[] { energyStateValue }));
 
 		// initialize the power state value
 		ActivePowerStateValue powerStateValue = new ActivePowerStateValue();
@@ -127,8 +127,8 @@ public class ZWaveMeteringPowerOutletInstance extends ZWaveDriverInstance
 		this.currentState.setState(
 				SinglePhaseActivePowerMeasurementState.class.getSimpleName(),
 
-				new SinglePhaseActivePowerMeasurementState(new StateValue[]{powerStateValue}));
-
+				new SinglePhaseActivePowerMeasurementState(
+						new StateValue[] { powerStateValue }));
 
 		// get the initial state of the device
 		Runnable worker = new Runnable()
@@ -241,62 +241,67 @@ public class ZWaveMeteringPowerOutletInstance extends ZWaveDriverInstance
 		// the power updated flag
 		boolean powerUpdated = false;
 
-		// Check if it is a real new value or if it is an old one. We can use
-		// one of the cc available
-		DataElemObject instance0 = ccElectricityEntry.get("0");
-
-		if (instance0 != null)
+		if (ccElectricityEntry != null)
 		{
-			long updateTime = instance0.getDataElem("val").getUpdateTime();
+			// Check if it is a real new value or if it is an old one. We can
+			// use
+			// one of the cc available
+			DataElemObject instance0 = ccElectricityEntry.get("0");
 
-			// first time we only save update time, no more
-			if (lastUpdateTime == 0)
-				lastUpdateTime = updateTime;
-
-			else if (lastUpdateTime < updateTime)
+			if (instance0 != null)
 			{
-				// update last update time
-				lastUpdateTime = updateTime;
-				nFailedUpdate = 0;
+				long updateTime = instance0.getDataElem("val").getUpdateTime();
 
-				// handle energy data if available
-				DataElemObject energyEntry = ccElectricityEntry.get("0");
-				if (energyEntry != null)
+				// first time we only save update time, no more
+				if (lastUpdateTime == 0)
+					lastUpdateTime = updateTime;
+
+				else if (lastUpdateTime < updateTime)
 				{
-					this.changeActiveEnergyState(Double.valueOf(
-							energyEntry.getDataElemValue("val").toString()));
+					// update last update time
+					lastUpdateTime = updateTime;
+					nFailedUpdate = 0;
 
-					energyUpdated = true;
+					// handle energy data if available
+					DataElemObject energyEntry = ccElectricityEntry.get("0");
+					if (energyEntry != null)
+					{
+						this.changeActiveEnergyState(Double.valueOf(energyEntry
+								.getDataElemValue("val").toString()));
 
-				}
+						energyUpdated = true;
 
-				// handle power data if available
-				DataElemObject powerEntry = ccElectricityEntry.get("2");
-				if (powerEntry != null)
-				{
-					this.changeActivePowerState(Double.valueOf(
-							powerEntry.getDataElemValue("val").toString()));
+					}
 
-					powerUpdated = true;
+					// handle power data if available
+					DataElemObject powerEntry = ccElectricityEntry.get("2");
+					if (powerEntry != null)
+					{
+						this.changeActivePowerState(Double.valueOf(
+								powerEntry.getDataElemValue("val").toString()));
 
+						powerUpdated = true;
+
+					}
 				}
 			}
-
-			// always update on-off state
-			int nLevel = 0;
-			CommandClasses ccEntryOnOff = instanceNode.getCommandClasses()
-					.get(ZWaveAPI.COMMAND_CLASS_SWITCH_BINARY);
-
-			if (ccEntryOnOff != null)
-				nLevel = ccEntryOnOff.getLevelAsInt();
-
-			// update the on/off state
-			boolean onoffChanged = this.changeOnOffState(
-					(nLevel > 0) ? OnOffState.ON : OnOffState.OFF);
-
-			if (onoffChanged || energyUpdated || powerUpdated)
-				this.updateStatus();
 		}
+
+		// always update on-off state
+		int nLevel = 0;
+		CommandClasses ccEntryOnOff = instanceNode.getCommandClasses()
+				.get(ZWaveAPI.COMMAND_CLASS_SWITCH_BINARY);
+
+		if (ccEntryOnOff != null)
+			nLevel = ccEntryOnOff.getLevelAsInt();
+
+		// update the on/off state
+		boolean onoffChanged = this.changeOnOffState(
+				(nLevel > 0) ? OnOffState.ON : OnOffState.OFF);
+
+		if (onoffChanged || energyUpdated || powerUpdated)
+			this.updateStatus();
+
 	}
 
 	/**
@@ -317,7 +322,6 @@ public class ZWaveMeteringPowerOutletInstance extends ZWaveDriverInstance
 		this.currentState
 				.getState(SinglePhaseActiveEnergyState.class.getSimpleName())
 				.getCurrentStateValue()[0].setValue(value);
-
 
 		// debug
 		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
