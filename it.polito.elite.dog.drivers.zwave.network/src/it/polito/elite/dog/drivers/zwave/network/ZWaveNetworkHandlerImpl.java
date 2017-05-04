@@ -610,7 +610,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 	private Set<ZWaveNodeInfo> findUnknownDevices()
 	{
 		// prepare the set of unknown devices
-		HashSet<ZWaveNodeInfo> unknownDevices = new HashSet<>();
+		HashSet<ZWaveNodeInfo> unknownDevices = new HashSet<ZWaveNodeInfo>();
 
 		// get all the devices in the current model tree
 		Map<Integer, Device> allDevices = this.modelTree.getDevices();
