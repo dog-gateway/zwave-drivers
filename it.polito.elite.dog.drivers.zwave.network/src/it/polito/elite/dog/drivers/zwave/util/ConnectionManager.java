@@ -155,10 +155,8 @@ public class ConnectionManager
 	 */
 	public ZWaveModelTree updateDevices(long lSince) throws Exception
 	{
-		Response response = service.path(DATA_PATH).path(String.valueOf(lSince))
-				.request(MediaType.APPLICATION_JSON_TYPE).post(null); // post
-																		// is
-																		// mandatory
+		Response response = service.path(DATA_PATH).path(String.valueOf(lSince))// after ZWay2.3.x lsince no longer works
+				.request(MediaType.APPLICATION_JSON).get(); // was post, after ZWay2.3.xpost no longer works from Jersey
 
 		if (response.getStatus() == Status.OK.getStatusCode())
 		{
@@ -242,8 +240,7 @@ public class ConnectionManager
 		String jsonResponse = null;
 
 		Response response = service.path(RUN_PATH).path(sCommand)
-				//
-				.request(MediaType.APPLICATION_JSON_TYPE).post(null); // post
+				.request(MediaType.APPLICATION_JSON_TYPE).get(); // was post, after razberry 2.3.x post no longer works from Jersey
 
 		if (response.getStatus() == Status.OK.getStatusCode())
 		{
