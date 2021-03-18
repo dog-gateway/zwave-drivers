@@ -21,19 +21,20 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map.Entry;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.ZWaveModelTree;
 
-import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.JsonProcessingException;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.node.ObjectNode;
 
 public class JsonUpdate 
 {
+	@SuppressWarnings("deprecation")
 	public static ZWaveModelTree updateModel(ObjectMapper mapper, JsonNode zWaveTree, String json) throws JsonProcessingException, IOException
 	{
 		JsonNode node = mapper.readTree(json);
-		Iterator<Entry<String, JsonNode>> it = node.getFields();
+		Iterator<Entry<String, JsonNode>> it = node.fields();
 		
 		while(it.hasNext())
 		{
@@ -54,6 +55,6 @@ public class JsonUpdate
 			((ObjectNode)x).put(sKey, n.getValue());
 		}
 		
-		return mapper.readValue(zWaveTree, ZWaveModelTree.class);
+		return mapper.treeToValue(zWaveTree, ZWaveModelTree.class);
 	}
 }

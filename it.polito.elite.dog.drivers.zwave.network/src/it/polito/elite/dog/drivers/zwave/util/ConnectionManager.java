@@ -27,10 +27,9 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
-import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.glassfish.jersey.jackson.JacksonFeature;
 import org.osgi.service.log.LogService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import it.polito.elite.dog.core.library.util.LogHelper;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.ZWaveModelTree;
@@ -65,6 +64,7 @@ public class ConnectionManager
 	// the logger
 	LogHelper logger;
 
+	@SuppressWarnings("deprecation")
 	public ConnectionManager(String sURL, String sUser, String sPassword,
 			LogHelper logger)
 	{
@@ -80,7 +80,6 @@ public class ConnectionManager
 			try
 			{
 				client = ClientBuilder.newBuilder()
-						.register(JacksonFeature.class)
 						.register(
 								new BasicAuthenticationFilter(sUser, sPassword))
 						.build();
@@ -95,8 +94,7 @@ public class ConnectionManager
 		else
 		{
 			// create simple client
-			client = ClientBuilder.newBuilder().register(JacksonFeature.class)
-					.build();
+			client = ClientBuilder.newBuilder().build();
 		}
 		service = client.target(sURL);
 	}

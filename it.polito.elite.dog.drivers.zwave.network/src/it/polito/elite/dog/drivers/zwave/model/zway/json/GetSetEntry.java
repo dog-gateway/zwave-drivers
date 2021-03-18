@@ -19,7 +19,9 @@ package it.polito.elite.dog.drivers.zwave.model.zway.json;
 
 import java.util.Map;
 
-import org.codehaus.jackson.annotate.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+
 
 public class GetSetEntry {
 	@JsonProperty("label") private String label;

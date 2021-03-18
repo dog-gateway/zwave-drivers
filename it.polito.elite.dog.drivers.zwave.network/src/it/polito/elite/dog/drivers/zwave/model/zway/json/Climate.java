@@ -17,7 +17,7 @@
  */
 package it.polito.elite.dog.drivers.zwave.model.zway.json;
 
-import org.codehaus.jackson.annotate.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class Climate {
 	@JsonProperty("updateTime") private Integer updateTime;
