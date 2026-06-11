@@ -17,6 +17,13 @@
  */
 package it.polito.elite.dog.drivers.zwave.movementsensor;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
+
+import org.osgi.framework.BundleContext;
+import org.osgi.service.log.Logger;
+
 import it.polito.elite.dog.core.library.model.ControllableDevice;
 import it.polito.elite.dog.core.library.model.DeviceStatus;
 import it.polito.elite.dog.core.library.model.devicecategory.Controllable;
@@ -25,8 +32,7 @@ import it.polito.elite.dog.core.library.model.state.MovementState;
 import it.polito.elite.dog.core.library.model.state.State;
 import it.polito.elite.dog.core.library.model.statevalue.MovingStateValue;
 import it.polito.elite.dog.core.library.model.statevalue.NotMovingStateValue;
-import it.polito.elite.dog.core.library.util.LogHelper;
-import it.polito.elite.dog.drivers.zwave.ZWaveAPI;
+import it.polito.elite.dog.drivers.zwave.model.ZWaveRawCommandClass;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.CommandClasses;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.Controller;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.Device;
@@ -36,29 +42,19 @@ import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
-
-import org.osgi.framework.BundleContext;
-import org.osgi.service.log.LogService;
-
-public class ZWaveMovementSensorDriverInstance extends ZWaveDriverInstance
-		implements MovementSensor
+public class ZWaveMovementSensorDriverInstance extends ZWaveDriverInstance implements MovementSensor
 {
 	// the class logger
-	private LogHelper logger;
+	private Logger logger;
 
-	public ZWaveMovementSensorDriverInstance(ZWaveNetwork network,
-			ControllableDevice device, int deviceId, Set<Integer> instancesId,
-			String gatewayEndpoint, int gatewayNodeId, int updateTimeMillis,
+	public ZWaveMovementSensorDriverInstance(ZWaveNetwork network, ControllableDevice device, int deviceId,
+			Set<Integer> instancesId, String gatewayEndpoint, int gatewayNodeId, int updateTimeMillis, Logger logger,
 			BundleContext context)
 	{
-		super(network, device, deviceId, instancesId, gatewayEndpoint,
-				gatewayNodeId, updateTimeMillis, context);
+		super(network, device, deviceId, instancesId, gatewayEndpoint, gatewayNodeId, updateTimeMillis, context);
 
 		// create a logger
-		logger = new LogHelper(context);
+		this.logger = logger;
 
 		// initialize states
 		this.initializeStates();
@@ -70,8 +66,7 @@ public class ZWaveMovementSensorDriverInstance extends ZWaveDriverInstance
 	private void initializeStates()
 	{
 		// initialize the state
-		this.currentState.setState(MovementState.class.getSimpleName(),
-				new MovementState(new NotMovingStateValue()));
+		this.currentState.setState(MovementState.class.getSimpleName(), new MovementState(new NotMovingStateValue()));
 
 		// get the initial state of the device
 		Runnable worker = new Runnable()
@@ -89,20 +84,17 @@ public class ZWaveMovementSensorDriverInstance extends ZWaveDriverInstance
 	}
 
 	@Override
-	public void newMessageFromHouse(Device deviceNode, Instance instanceNode,
-			Controller controllerNode, String sValue)
+	public void newMessageFromHouse(Device deviceNode, Instance instanceNode, Controller controllerNode, String sValue)
 	{
 		this.deviceNode = deviceNode;
 
 		// Read the value associated with the right CommandClass.
-		CommandClasses ccEntry = instanceNode
-				.getCommandClass(ZWaveAPI.COMMAND_CLASS_SENSOR_BINARY);
+		CommandClasses ccEntry = instanceNode.getCommandClass(ZWaveRawCommandClass.COMMAND_CLASS_SENSOR_BINARY);
 
 		if (ccEntry != null)
 
 			// notify open/close only if changed
-			if (changeMovementState((ccEntry.getLevelAsBoolean()
-					? MovementState.ISMOVING : MovementState.NOTMOVING)))
+			if (changeMovementState((ccEntry.getLevelAsBoolean() ? MovementState.ISMOVING : MovementState.NOTMOVING)))
 				// notify state changed
 				this.updateStatus();
 
@@ -122,12 +114,10 @@ public class ZWaveMovementSensorDriverInstance extends ZWaveDriverInstance
 
 		// the current state
 		String currentStateValue = "";
-		State state = currentState
-				.getState(MovementState.class.getSimpleName());
+		State state = currentState.getState(MovementState.class.getSimpleName());
 
 		if (state != null)
-			currentStateValue = (String) state.getCurrentStateValue()[0]
-					.getValue();
+			currentStateValue = (String) state.getCurrentStateValue()[0].getValue();
 
 		// if the current states it is different from the new state
 		if (!currentStateValue.equalsIgnoreCase(movementState))
@@ -136,27 +126,22 @@ public class ZWaveMovementSensorDriverInstance extends ZWaveDriverInstance
 			if (movementState.equalsIgnoreCase(MovementState.ISMOVING))
 			{
 				// update the state
-				MovementState movState = new MovementState(
-						new MovingStateValue());
-				currentState.setState(MovementState.class.getSimpleName(),
-						movState);
+				MovementState movState = new MovementState(new MovingStateValue());
+				currentState.setState(MovementState.class.getSimpleName(), movState);
 
 				this.notifyStartedMovement(); // notify moving
 			}
 			else
 			{
 				// update the state
-				MovementState movState = new MovementState(
-						new NotMovingStateValue());
-				currentState.setState(MovementState.class.getSimpleName(),
-						movState);
+				MovementState movState = new MovementState(new NotMovingStateValue());
+				currentState.setState(MovementState.class.getSimpleName(), movState);
 
 				this.notifyCeasedMovement(); // notify not moving
 
 			}
 
-			logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
-					+ " value is now " + movementState);
+			logger.debug("Device " + device.getDeviceId() + " value is now " + movementState);
 
 			stateChanged = true;
 		}
@@ -190,21 +175,19 @@ public class ZWaveMovementSensorDriverInstance extends ZWaveDriverInstance
 	}
 
 	@Override
-	protected ZWaveNodeInfo createNodeInfo(int deviceId,
-			Set<Integer> instancesId, boolean isController)
+	protected ZWaveNodeInfo createNodeInfo(int deviceId, Set<Integer> instancesId, boolean isController)
 	{
 		HashMap<Integer, Set<Integer>> instanceCommand = new HashMap<Integer, Set<Integer>>();
 
 		HashSet<Integer> ccSet = new HashSet<Integer>();
-		ccSet.add(ZWaveAPI.COMMAND_CLASS_SENSOR_BINARY);
+		ccSet.add(ZWaveRawCommandClass.COMMAND_CLASS_SENSOR_BINARY);
 
 		// binary switch has its own command class
 		for (Integer instanceId : instancesId)
 		{
 			instanceCommand.put(instanceId, ccSet);
 		}
-		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(this.gatewayEndpoint,
-				deviceId, instanceCommand, isController);
+		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(this.gatewayEndpoint, deviceId, instanceCommand, isController);
 		return nodeInfo;
 	}
 

@@ -28,7 +28,6 @@ import java.util.HashSet;
 
 import org.osgi.framework.BundleContext;
 import org.osgi.service.cm.ConfigurationException;
-import org.osgi.service.log.LogService;
 
 public class ZWaveDimmerDeviceDriver extends ZWaveDeviceDriver
 {
@@ -50,7 +49,7 @@ public class ZWaveDimmerDeviceDriver extends ZWaveDeviceDriver
 
 		return new ZWaveDimmerDeviceDriverInstance(zWaveNetwork, device,
 				nodeId, instancesId, gatewayEndpoint, gatewayNodeId, updateTimeMillis,
-				stepPercentage, context);
+				stepPercentage, this.logger, context);
 	}
 	
 	@Override
@@ -71,7 +70,7 @@ public class ZWaveDimmerDeviceDriver extends ZWaveDeviceDriver
 			}
 			else
 			{
-				this.logger.log(LogService.LOG_WARNING, ZWaveInfo.PROPERTY_STEP_PERCENT
+				this.logger.warn( ZWaveInfo.PROPERTY_STEP_PERCENT
 						+ " not defined in configuraton file for "
 						+ ZWaveDimmerDeviceDriver.class.getName());
 			}

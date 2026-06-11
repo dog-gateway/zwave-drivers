@@ -17,6 +17,17 @@
  */
 package it.polito.elite.dog.drivers.zwave.dimmerdevice;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
+
+import javax.measure.DecimalMeasure;
+import javax.measure.Measure;
+import javax.measure.unit.Unit;
+
+import org.osgi.framework.BundleContext;
+import org.osgi.service.log.Logger;
+
 import it.polito.elite.dog.core.library.model.ControllableDevice;
 import it.polito.elite.dog.core.library.model.DeviceStatus;
 import it.polito.elite.dog.core.library.model.devicecategory.Controllable;
@@ -28,8 +39,7 @@ import it.polito.elite.dog.core.library.model.state.State;
 import it.polito.elite.dog.core.library.model.statevalue.LevelStateValue;
 import it.polito.elite.dog.core.library.model.statevalue.OffStateValue;
 import it.polito.elite.dog.core.library.model.statevalue.OnStateValue;
-import it.polito.elite.dog.core.library.util.LogHelper;
-import it.polito.elite.dog.drivers.zwave.ZWaveAPI;
+import it.polito.elite.dog.drivers.zwave.model.ZWaveRawCommandClass;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.CommandClasses;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.Controller;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.Device;
@@ -39,22 +49,10 @@ import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
-
-import javax.measure.DecimalMeasure;
-import javax.measure.Measure;
-import javax.measure.unit.Unit;
-
-import org.osgi.framework.BundleContext;
-import org.osgi.service.log.LogService;
-
-public class ZWaveDimmerDeviceDriverInstance extends ZWaveDriverInstance
-		implements DimmerLamp, LevelControllableOutput
+public class ZWaveDimmerDeviceDriverInstance extends ZWaveDriverInstance implements DimmerLamp, LevelControllableOutput
 {
 	// the class logger
-	private LogHelper logger;
+	private Logger logger;
 
 	// the step increase / decrease
 	private int stepPercentage = 5; // default
@@ -65,13 +63,11 @@ public class ZWaveDimmerDeviceDriverInstance extends ZWaveDriverInstance
 	// the scene set
 	private HashSet<Integer> scenes;
 
-	public ZWaveDimmerDeviceDriverInstance(ZWaveNetwork network,
-			ControllableDevice device, int deviceId, Set<Integer> instancesId,
-			String gatewayEndpoint, int gatewayNodeId, int updateTimeMillis,
-			int stepPercentage, BundleContext context)
+	public ZWaveDimmerDeviceDriverInstance(ZWaveNetwork network, ControllableDevice device, int deviceId,
+			Set<Integer> instancesId, String gatewayEndpoint, int gatewayNodeId, int updateTimeMillis,
+			int stepPercentage, Logger logger, BundleContext context)
 	{
-		super(network, device, deviceId, instancesId, gatewayEndpoint,
-				gatewayNodeId, updateTimeMillis, context);
+		super(network, device, deviceId, instancesId, gatewayEndpoint, gatewayNodeId, updateTimeMillis, context);
 
 		this.stepPercentage = stepPercentage;
 
@@ -80,7 +76,7 @@ public class ZWaveDimmerDeviceDriverInstance extends ZWaveDriverInstance
 		this.scenes = new HashSet<Integer>();
 
 		// create a logger
-		logger = new LogHelper(context);
+		this.logger = logger;
 
 		// initialize states
 		this.initializeStates();
@@ -107,15 +103,13 @@ public class ZWaveDimmerDeviceDriverInstance extends ZWaveDriverInstance
 	}
 
 	@Override
-	public void newMessageFromHouse(Device deviceNode, Instance instanceNode,
-			Controller controllerNode, String sValue)
+	public void newMessageFromHouse(Device deviceNode, Instance instanceNode, Controller controllerNode, String sValue)
 	{
 		this.deviceNode = deviceNode;
 
 		// Read the value associated with the right CommandClass.
 		int nLevel = 0;
-		CommandClasses ccEntry = instanceNode
-				.getCommandClass(ZWaveAPI.COMMAND_CLASS_SWITCH_MULTILEVEL);
+		CommandClasses ccEntry = instanceNode.getCommandClass(ZWaveRawCommandClass.COMMAND_CLASS_SWITCH_MULTILEVEL);
 
 		// Check if it is a real new value or if it is an old one
 		if (ccEntry != null)
@@ -127,8 +121,7 @@ public class ZWaveDimmerDeviceDriverInstance extends ZWaveDriverInstance
 			nLevel = ccEntry.getLevelAsInt();
 
 			// the updated flags
-			boolean updatedOnOff = changeOnOffState(
-					(nLevel > 0) ? OnOffState.ON : OnOffState.OFF);
+			boolean updatedOnOff = changeOnOffState((nLevel > 0) ? OnOffState.ON : OnOffState.OFF);
 			boolean updatedLevel = changeLevelState(nLevel);
 
 			if (updatedOnOff || updatedLevel)
@@ -154,8 +147,7 @@ public class ZWaveDimmerDeviceDriverInstance extends ZWaveDriverInstance
 		State state = currentState.getState(OnOffState.class.getSimpleName());
 
 		if (state != null)
-			currentStateValue = (String) state.getCurrentStateValue()[0]
-					.getValue();
+			currentStateValue = (String) state.getCurrentStateValue()[0].getValue();
 
 		// if the current states it is different from the new state
 		if (!currentStateValue.equalsIgnoreCase(OnOffValue))
@@ -165,26 +157,20 @@ public class ZWaveDimmerDeviceDriverInstance extends ZWaveDriverInstance
 			{
 				// update the state
 				OnOffState onState = new OnOffState(new OnStateValue());
-				currentState.setState(OnOffState.class.getSimpleName(),
-						onState);
+				currentState.setState(OnOffState.class.getSimpleName(), onState);
 
-				logger.log(LogService.LOG_DEBUG, "Device "
-						+ device.getDeviceId() + " is now "
-						+ ((OnOffState) onState).getCurrentStateValue()[0]
-								.getValue());
+				logger.debug("Device " + device.getDeviceId() + " is now "
+						+ ((OnOffState) onState).getCurrentStateValue()[0].getValue());
 				this.notifyOn();
 			}
 			else
 			{
 				// update the state
 				OnOffState offState = new OnOffState(new OffStateValue());
-				currentState.setState(OnOffState.class.getSimpleName(),
-						offState);
+				currentState.setState(OnOffState.class.getSimpleName(), offState);
 
-				logger.log(LogService.LOG_DEBUG, "Device "
-						+ device.getDeviceId() + " is now "
-						+ ((OnOffState) offState).getCurrentStateValue()[0]
-								.getValue());
+				logger.debug("Device " + device.getDeviceId() + " is now "
+						+ ((OnOffState) offState).getCurrentStateValue()[0].getValue());
 				this.notifyOff();
 			}
 
@@ -209,12 +195,11 @@ public class ZWaveDimmerDeviceDriverInstance extends ZWaveDriverInstance
 
 		// get the current state
 		// get the current state value
-		Integer currentStateValue = new Integer(0);
+		Integer currentStateValue = Integer.valueOf(0);
 		State state = currentState.getState(LevelState.class.getSimpleName());
 
 		if (state != null)
-			currentStateValue = (Integer) state.getCurrentStateValue()[0]
-					.getValue();
+			currentStateValue = (Integer) state.getCurrentStateValue()[0].getValue();
 
 		// check if the state is changed or not
 		if (currentStateValue.intValue() != nLevel)
@@ -224,8 +209,7 @@ public class ZWaveDimmerDeviceDriverInstance extends ZWaveDriverInstance
 			pValue.setValue(nLevel);
 
 			// change the current level state
-			currentState.setState(LevelState.class.getSimpleName(),
-					new LevelState(pValue));
+			currentState.setState(LevelState.class.getSimpleName(), new LevelState(pValue));
 
 			// send the changed level notification
 			this.notifyChangedLevel(DecimalMeasure.valueOf(nLevel, Unit.ONE));
@@ -235,8 +219,7 @@ public class ZWaveDimmerDeviceDriverInstance extends ZWaveDriverInstance
 		}
 
 		// debug
-		logger.log(LogService.LOG_DEBUG,
-				"Device " + device.getDeviceId() + " dimmer at " + nLevel);
+		logger.debug("Device " + device.getDeviceId() + " dimmer at " + nLevel);
 
 		return stateChanged;
 	}
@@ -273,7 +256,7 @@ public class ZWaveDimmerDeviceDriverInstance extends ZWaveDriverInstance
 		for (Integer instanceId : nodeInfo.getInstanceSet())
 			if (this.handler != null)
 				this.handler.write(nodeInfo.getDeviceNodeId(), instanceId,
-						ZWaveAPI.COMMAND_CLASS_SWITCH_MULTILEVEL, "255");
+						ZWaveRawCommandClass.COMMAND_CLASS_SWITCH_MULTILEVEL, "255");
 	}
 
 	@Override
@@ -283,25 +266,23 @@ public class ZWaveDimmerDeviceDriverInstance extends ZWaveDriverInstance
 		for (Integer instanceId : nodeInfo.getInstanceSet())
 			if (this.handler != null)
 				this.handler.write(nodeInfo.getDeviceNodeId(), instanceId,
-						ZWaveAPI.COMMAND_CLASS_SWITCH_MULTILEVEL, "0");
+						ZWaveRawCommandClass.COMMAND_CLASS_SWITCH_MULTILEVEL, "0");
 	}
 
 	@Override
-	protected ZWaveNodeInfo createNodeInfo(int deviceId,
-			Set<Integer> instancesId, boolean isController)
+	protected ZWaveNodeInfo createNodeInfo(int deviceId, Set<Integer> instancesId, boolean isController)
 	{
 		HashMap<Integer, Set<Integer>> instanceCommand = new HashMap<Integer, Set<Integer>>();
 
 		HashSet<Integer> ccSet = new HashSet<Integer>();
-		ccSet.add(ZWaveAPI.COMMAND_CLASS_SWITCH_MULTILEVEL);
+		ccSet.add(ZWaveRawCommandClass.COMMAND_CLASS_SWITCH_MULTILEVEL);
 
 		// binary switch has its own command class
 		for (Integer instanceId : instancesId)
 		{
 			instanceCommand.put(instanceId, ccSet);
 		}
-		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(this.gatewayEndpoint,
-				deviceId, instanceCommand, isController);
+		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(this.gatewayEndpoint, deviceId, instanceCommand, isController);
 		return nodeInfo;
 	}
 
@@ -312,17 +293,15 @@ public class ZWaveDimmerDeviceDriverInstance extends ZWaveDriverInstance
 		for (Integer instanceId : nodeInfo.getInstanceSet())
 			if (this.handler != null)
 				this.handler.write(nodeInfo.getDeviceNodeId(), instanceId,
-						ZWaveAPI.COMMAND_CLASS_SWITCH_MULTILEVEL,
-						value.toString());
+						ZWaveRawCommandClass.COMMAND_CLASS_SWITCH_MULTILEVEL, value.toString());
 	}
 
 	@Override
 	public void stepDown()
 	{
 		// get the current level value
-		int currentValue = (Integer) currentState
-				.getState(LevelState.class.getSimpleName())
-				.getCurrentStateValue()[0].getValue();
+		int currentValue = (Integer) currentState.getState(LevelState.class.getSimpleName()).getCurrentStateValue()[0]
+				.getValue();
 
 		// set to 100%
 		if (currentValue == 255)
@@ -340,9 +319,8 @@ public class ZWaveDimmerDeviceDriverInstance extends ZWaveDriverInstance
 	public void stepUp()
 	{
 		// get the current level value
-		int currentValue = (Integer) currentState
-				.getState(LevelState.class.getSimpleName())
-				.getCurrentStateValue()[0].getValue();
+		int currentValue = (Integer) currentState.getState(LevelState.class.getSimpleName()).getCurrentStateValue()[0]
+				.getValue();
 
 		// increase by step percentage
 		currentValue = Math.min(100, currentValue + this.stepPercentage);

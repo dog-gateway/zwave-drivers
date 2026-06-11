@@ -45,6 +45,6 @@ public class ZWaveDoorWindowSensorDriver extends ZWaveDeviceDriver
 			int updateTimeMillis, BundleContext context)
 	{
 		return new ZWaveDoorWindowSensorDriverInstance(zWaveNetwork, device,
-				nodeId, instancesId, gatewayEndpoint, gatewayNodeId, updateTimeMillis, context);
+				nodeId, instancesId, gatewayEndpoint, gatewayNodeId, updateTimeMillis, this.logger, context);
 	}
 }

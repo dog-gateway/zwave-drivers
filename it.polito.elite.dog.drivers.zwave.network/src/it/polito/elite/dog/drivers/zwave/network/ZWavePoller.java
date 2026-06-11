@@ -17,17 +17,16 @@
  */
 package it.polito.elite.dog.drivers.zwave.network;
 
-import it.polito.elite.dog.core.library.util.LogHelper;
-import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
-import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.osgi.service.log.LogService;
+import org.osgi.service.log.Logger;
+
+import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
+import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
 
 /**
  * This class implements the low-level ZWave polling Thread. Every polling time,
@@ -46,7 +45,7 @@ public class ZWavePoller extends Thread
 	private boolean runnable = true;
 
 	// the poller logger
-	private LogHelper logger;
+	private Logger logger;
 
 	// the polling time to use
 	private int pollingTimeMillis;
@@ -88,7 +87,7 @@ public class ZWavePoller extends Thread
 		while (this.runnable)
 		{
 			// log
-			this.logger.log(LogService.LOG_DEBUG,
+			this.logger.debug(ZWaveDriverImpl.LOG_ID+
 					"Starting a new polling cycle...");
 
 			// get the current time (WARNING: Locale is not considered here)
@@ -124,7 +123,7 @@ public class ZWavePoller extends Thread
 			catch (InterruptedException e)
 			{
 				// log the error
-				this.logger.log(LogService.LOG_WARNING,
+				this.logger.warn(ZWaveDriverImpl.LOG_ID+
 						"Interrupted exception: " + e);
 			}
 
@@ -163,7 +162,7 @@ public class ZWavePoller extends Thread
 		// driver.getPollingTimeMillis()
 		if (updateTimeMillis < this.pollingTimeMillis)
 		{
-			this.logger.log(LogService.LOG_WARNING,
+			this.logger.warn(ZWaveDriverImpl.LOG_ID+
 					"Min value allowed for device.'updateTimeMillis' is equals to network.'pollingTimeMillis'");
 			updateTimeMillis = this.pollingTimeMillis;
 		}

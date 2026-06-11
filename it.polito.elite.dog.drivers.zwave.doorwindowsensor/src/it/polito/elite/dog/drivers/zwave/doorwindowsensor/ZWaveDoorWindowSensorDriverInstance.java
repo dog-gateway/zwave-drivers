@@ -17,6 +17,13 @@
  */
 package it.polito.elite.dog.drivers.zwave.doorwindowsensor;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
+
+import org.osgi.framework.BundleContext;
+import org.osgi.service.log.Logger;
+
 import it.polito.elite.dog.core.library.model.ControllableDevice;
 import it.polito.elite.dog.core.library.model.DeviceStatus;
 import it.polito.elite.dog.core.library.model.devicecategory.Controllable;
@@ -26,8 +33,7 @@ import it.polito.elite.dog.core.library.model.state.OpenCloseState;
 import it.polito.elite.dog.core.library.model.state.State;
 import it.polito.elite.dog.core.library.model.statevalue.CloseStateValue;
 import it.polito.elite.dog.core.library.model.statevalue.OpenStateValue;
-import it.polito.elite.dog.core.library.util.LogHelper;
-import it.polito.elite.dog.drivers.zwave.ZWaveAPI;
+import it.polito.elite.dog.drivers.zwave.model.ZWaveRawCommandClass;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.CommandClasses;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.Controller;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.Device;
@@ -37,29 +43,22 @@ import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
-
-import org.osgi.framework.BundleContext;
-import org.osgi.service.log.LogService;
-
 public class ZWaveDoorWindowSensorDriverInstance extends ZWaveDriverInstance
 		implements DoorSensor, WindowSensor
 {
 	// the class logger
-	private LogHelper logger;
+	private Logger logger;
 
 	public ZWaveDoorWindowSensorDriverInstance(ZWaveNetwork network,
 			ControllableDevice device, int deviceId, Set<Integer> instancesId,
 			String gatewayEndpoint, int gatewayNodeId, int updateTimeMillis,
-			BundleContext context)
+			Logger logger, BundleContext context)
 	{
 		super(network, device, deviceId, instancesId, gatewayEndpoint,
 				gatewayNodeId, updateTimeMillis, context);
 
 		// create a logger
-		logger = new LogHelper(context);
+		this.logger = logger;
 
 		// initialize states
 		this.initializeStates();
@@ -97,7 +96,7 @@ public class ZWaveDoorWindowSensorDriverInstance extends ZWaveDriverInstance
 
 		// Read the value associated with the right CommandClass.
 		CommandClasses ccEntry = instanceNode
-				.getCommandClass(ZWaveAPI.COMMAND_CLASS_SENSOR_BINARY);
+				.getCommandClass(ZWaveRawCommandClass.COMMAND_CLASS_SENSOR_BINARY);
 
 		if (ccEntry != null)
 		{
@@ -158,7 +157,7 @@ public class ZWaveDoorWindowSensorDriverInstance extends ZWaveDriverInstance
 				notifyOpen(); // notify open
 			}
 
-			logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
+			logger.debug("Device " + device.getDeviceId()
 					+ " is now " + openCloseValue);
 
 			stateChanged = true;
@@ -212,7 +211,7 @@ public class ZWaveDoorWindowSensorDriverInstance extends ZWaveDriverInstance
 
 		// binary switch has its own command class
 		HashSet<Integer> ccSet = new HashSet<Integer>();
-		ccSet.add(ZWaveAPI.COMMAND_CLASS_SENSOR_BINARY);
+		ccSet.add(ZWaveRawCommandClass.COMMAND_CLASS_SENSOR_BINARY);
 
 		for (Integer instanceId : instancesId)
 		{

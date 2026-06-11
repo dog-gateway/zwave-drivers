@@ -15,13 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License
  */
-package it.polito.elite.dog.drivers.zwave;
+package it.polito.elite.dog.drivers.zwave.model;
 
 /**
  * http://wiki.micasaverde.com/index.php/ZWave_Command_Classes
  * http://www.agocontrol.com/trac/browser/agocontrol/agocontrol/devices/zwave/ZWApi.h
  */
-public class ZWaveAPI
+public class ZWaveRawCommandClass
 {
 	public static final int ROOT_ELEMENT = 			0;
 	

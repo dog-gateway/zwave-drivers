@@ -18,8 +18,6 @@
 package it.polito.elite.dog.drivers.zwave.model.zway.json;
 
 
-import it.polito.elite.dog.drivers.zwave.ZWaveAPI;
-
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +25,8 @@ import java.util.Map.Entry;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
+import it.polito.elite.dog.drivers.zwave.model.ZWaveRawCommandClass;
 
 
 
@@ -93,7 +93,7 @@ public class Device
 
 	public Instance getZeroInstance()
 	{
-		return instances.get(ZWaveAPI.ROOT_ELEMENT);
+		return instances.get(ZWaveRawCommandClass.ROOT_ELEMENT);
 	}
 
 	public int getBasicType()
@@ -220,11 +220,11 @@ public class Device
 
 	public boolean hasWakeup()
 	{
-		return hasCommandClass(ZWaveAPI.COMMAND_CLASS_WAKE_UP);
+		return hasCommandClass(ZWaveRawCommandClass.COMMAND_CLASS_WAKE_UP);
 	}
 
 	public boolean hasBattery()
 	{
-		return hasCommandClass(ZWaveAPI.COMMAND_CLASS_BATTERY);
+		return hasCommandClass(ZWaveRawCommandClass.COMMAND_CLASS_BATTERY);
 	}
 }

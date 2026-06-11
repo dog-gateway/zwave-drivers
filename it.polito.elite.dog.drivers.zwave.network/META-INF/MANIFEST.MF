@@ -1,12 +1,12 @@
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
+Automatic-Module-Name: it.polito.elite.dog.drivers.zwave.network
 Bundle-Name: ZWaveNetworkDriver
 Bundle-SymbolicName: it.polito.elite.dog.drivers.zwave.network
 Bundle-Version: 1.1.0
-Bundle-RequiredExecutionEnvironment: JavaSE-1.6
+Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Service-Component: OSGI-INF/component.xml
-Export-Package: it.polito.elite.dog.drivers.zwave,
- it.polito.elite.dog.drivers.zwave.model,
+Export-Package: it.polito.elite.dog.drivers.zwave.model,
  it.polito.elite.dog.drivers.zwave.model.commandclasses,
  it.polito.elite.dog.drivers.zwave.model.zway.json,
  it.polito.elite.dog.drivers.zwave.network,
@@ -22,10 +22,7 @@ Import-Package: com.fasterxml.jackson.annotation;version="2.11.2",
  it.polito.elite.dog.core.library.model.devicecategory,
  it.polito.elite.dog.core.library.util,
  javax.measure;version="4.3.1",
- javax.ws.rs.client;version="2.0.0",
  javax.ws.rs.core,
- org.glassfish.jersey.client;version="2.0.0",
- org.glassfish.jersey.internal.util;version="2.0.0",
  org.osgi.framework,
  org.osgi.service.cm;version="1.4.0",
  org.osgi.service.device;version="1.1.0",

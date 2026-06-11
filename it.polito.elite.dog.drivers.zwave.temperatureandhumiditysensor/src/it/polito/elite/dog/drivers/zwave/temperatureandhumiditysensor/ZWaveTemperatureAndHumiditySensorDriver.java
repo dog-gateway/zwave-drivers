@@ -46,7 +46,7 @@ public class ZWaveTemperatureAndHumiditySensorDriver extends ZWaveDeviceDriver
 	{
 		return new ZWaveTemperatureAndHumiditySensorDriverInstance(
 				zWaveNetwork, device, nodeId, instancesId, gatewayEndpoint, gatewayNodeId,
-				updateTimeMillis, context);
+				updateTimeMillis, this.logger, context);
 	}
 
 }

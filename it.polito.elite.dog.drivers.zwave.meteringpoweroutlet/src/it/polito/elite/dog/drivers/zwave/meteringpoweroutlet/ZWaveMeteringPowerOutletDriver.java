@@ -42,6 +42,6 @@ public class ZWaveMeteringPowerOutletDriver extends ZWaveDeviceDriver
 	{
 		return new ZWaveMeteringPowerOutletInstance(zWaveNetwork, device,
 				nodeId, instancesId, gatewayEndpoint, gatewayNodeId,
-				updateTimeMillis, context);
+				updateTimeMillis, this.logger, context);
 	}
 }
