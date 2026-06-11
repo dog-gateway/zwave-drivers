@@ -1,10 +1,11 @@
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
+Automatic-Module-Name: it.polito.elite.dog.drivers.zwave.thermostaticradiatorvalve
 Bundle-Name: ZWaveThermostaticRadiatorValve
 Bundle-SymbolicName: it.polito.elite.dog.drivers.zwave.thermostaticradiatorvalve
 Bundle-Version: 1.1.2
 Bundle-Vendor: it.polito.elite
-Bundle-RequiredExecutionEnvironment: JavaSE-1.6
+Bundle-RequiredExecutionEnvironment: JavaSE-1.8
 Service-Component: OSGI-INF/component.xml
 Import-Package: com.fasterxml.jackson.annotation;version="2.11.2",
  com.fasterxml.jackson.core;version="2.11.2",
@@ -16,7 +17,7 @@ Import-Package: com.fasterxml.jackson.annotation;version="2.11.2",
  it.polito.elite.dog.core.library.model.state;version="1.1.0",
  it.polito.elite.dog.core.library.model.statevalue;version="1.1.0",
  it.polito.elite.dog.core.library.util,
- it.polito.elite.dog.drivers.zwave,
+ it.polito.elite.dog.drivers.zwave.model,
  it.polito.elite.dog.drivers.zwave.device,
  it.polito.elite.dog.drivers.zwave.gateway,
  it.polito.elite.dog.drivers.zwave.model.commandclasses,

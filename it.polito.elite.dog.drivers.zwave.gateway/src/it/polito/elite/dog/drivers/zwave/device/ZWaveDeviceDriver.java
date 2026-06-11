@@ -20,8 +20,8 @@ package it.polito.elite.dog.drivers.zwave.device;
 import it.polito.elite.dog.core.library.model.ControllableDevice;
 import it.polito.elite.dog.core.library.model.DeviceCostants;
 import it.polito.elite.dog.core.library.model.devicecategory.Controllable;
-import it.polito.elite.dog.core.library.util.LogHelper;
 import it.polito.elite.dog.drivers.zwave.gateway.ZWaveGatewayDriver;
+import it.polito.elite.dog.drivers.zwave.network.ZWaveDriverImpl;
 import it.polito.elite.dog.drivers.zwave.network.ZWaveDriverInstance;
 import it.polito.elite.dog.drivers.zwave.network.info.ZWaveInfo;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
@@ -40,6 +40,8 @@ import org.osgi.service.cm.ConfigurationException;
 import org.osgi.service.cm.ManagedService;
 import org.osgi.service.device.Device;
 import org.osgi.service.device.Driver;
+import org.osgi.service.log.Logger;
+import org.osgi.service.log.LoggerFactory;
 
 public abstract class ZWaveDeviceDriver implements Driver, ManagedService
 {
@@ -47,7 +49,8 @@ public abstract class ZWaveDeviceDriver implements Driver, ManagedService
 	protected BundleContext context;
 
 	// System logger
-	protected LogHelper logger;
+	protected Logger logger;
+	protected AtomicReference<LoggerFactory> loggerFactory;
 
 	// a reference to the network driver
 	private AtomicReference<ZWaveNetwork> network;
@@ -85,6 +88,7 @@ public abstract class ZWaveDeviceDriver implements Driver, ManagedService
 		// intialize atomic references
 		this.gateway = new AtomicReference<ZWaveGatewayDriver>();
 		this.network = new AtomicReference<ZWaveNetwork>();
+		this.loggerFactory = new AtomicReference<LoggerFactory>();
 
 		// initialize the connected drivers list
 		this.managedInstances = new Hashtable<String, ZWaveDriverInstance>();
@@ -98,8 +102,6 @@ public abstract class ZWaveDeviceDriver implements Driver, ManagedService
 	 */
 	public void activate(BundleContext bundleContext)
 	{
-		// init the logger
-		this.logger = new LogHelper(bundleContext);
 
 		// store the context
 		this.context = bundleContext;
@@ -129,6 +131,36 @@ public abstract class ZWaveDeviceDriver implements Driver, ManagedService
 			// unregisters this driver from the OSGi framework
 			unRegisterZWaveDeviceDriver();
 	}
+	
+	 /**
+     * Handle binding of the {@link LoggerFactory} service needed to log
+     * diagnostic messages.
+     * 
+     * @param loggerFactory
+     *            The {@link LoggerFactory} instance available in the framework.
+     */
+    public void addedLoggerFactory(LoggerFactory loggerFactory)
+    {
+        // store the logger factory
+        this.loggerFactory.set(loggerFactory);
+        // create the logger
+        this.logger = loggerFactory.getLogger(ZWaveDriverImpl.class);
+    }
+
+    /**
+     * Handle un-binding of the {@link LoggerFactory} service needed to log
+     * diagnostic messages.
+     * 
+     * @param loggerFactory
+     *            The {@link LoggerFactory} service that became unavailable.
+     */
+    public void removedLoggerFactory(LoggerFactory loggerFactory)
+    {
+        if (this.loggerFactory.compareAndSet(loggerFactory, null))
+        {
+            this.logger = null;
+        }
+    }
 
 	@SuppressWarnings("rawtypes")
 	@Override

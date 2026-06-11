@@ -45,6 +45,6 @@ public class ZWaveQuadSensorDriver extends ZWaveDeviceDriver
 	{
 
 		return new ZWaveQuadSensorDriverInstance(zWaveNetwork, device, nodeId,
-				instancesId, gatewayEndpoint, gatewayNodeId, updateTimeMillis, context);
+				instancesId, gatewayEndpoint, gatewayNodeId, updateTimeMillis, this.logger,context);
 	}
 }

@@ -17,29 +17,6 @@
  */
 package it.polito.elite.dog.drivers.zwave.temperatureandhumiditysensor;
 
-import it.polito.elite.dog.core.library.model.ControllableDevice;
-import it.polito.elite.dog.core.library.model.DeviceStatus;
-import it.polito.elite.dog.core.library.model.devicecategory.Controllable;
-import it.polito.elite.dog.core.library.model.devicecategory.QuadSensor;
-import it.polito.elite.dog.core.library.model.devicecategory.TemperatureAndHumiditySensor;
-import it.polito.elite.dog.core.library.model.state.HumidityMeasurementState;
-import it.polito.elite.dog.core.library.model.state.TemperatureState;
-import it.polito.elite.dog.core.library.model.statevalue.HumidityStateValue;
-import it.polito.elite.dog.core.library.model.statevalue.TemperatureStateValue;
-import it.polito.elite.dog.core.library.util.LogHelper;
-import it.polito.elite.dog.drivers.zwave.ZWaveAPI;
-import it.polito.elite.dog.drivers.zwave.model.SensorType;
-import it.polito.elite.dog.drivers.zwave.model.zway.json.CommandClasses;
-import it.polito.elite.dog.drivers.zwave.model.zway.json.CommandClassesData;
-import it.polito.elite.dog.drivers.zwave.model.zway.json.Controller;
-import it.polito.elite.dog.drivers.zwave.model.zway.json.DataElemObject;
-import it.polito.elite.dog.drivers.zwave.model.zway.json.Device;
-import it.polito.elite.dog.drivers.zwave.model.zway.json.Instance;
-import it.polito.elite.dog.drivers.zwave.network.ZWaveDriverInstance;
-import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
-import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
-import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
-
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -53,14 +30,36 @@ import javax.measure.unit.Unit;
 import javax.measure.unit.UnitFormat;
 
 import org.osgi.framework.BundleContext;
-import org.osgi.service.log.LogService;
+import org.osgi.service.log.Logger;
+
+import it.polito.elite.dog.core.library.model.ControllableDevice;
+import it.polito.elite.dog.core.library.model.DeviceStatus;
+import it.polito.elite.dog.core.library.model.devicecategory.Controllable;
+import it.polito.elite.dog.core.library.model.devicecategory.QuadSensor;
+import it.polito.elite.dog.core.library.model.devicecategory.TemperatureAndHumiditySensor;
+import it.polito.elite.dog.core.library.model.state.HumidityMeasurementState;
+import it.polito.elite.dog.core.library.model.state.TemperatureState;
+import it.polito.elite.dog.core.library.model.statevalue.HumidityStateValue;
+import it.polito.elite.dog.core.library.model.statevalue.TemperatureStateValue;
+import it.polito.elite.dog.drivers.zwave.model.SensorType;
+import it.polito.elite.dog.drivers.zwave.model.ZWaveRawCommandClass;
+import it.polito.elite.dog.drivers.zwave.model.zway.json.CommandClasses;
+import it.polito.elite.dog.drivers.zwave.model.zway.json.CommandClassesData;
+import it.polito.elite.dog.drivers.zwave.model.zway.json.Controller;
+import it.polito.elite.dog.drivers.zwave.model.zway.json.DataElemObject;
+import it.polito.elite.dog.drivers.zwave.model.zway.json.Device;
+import it.polito.elite.dog.drivers.zwave.model.zway.json.Instance;
+import it.polito.elite.dog.drivers.zwave.network.ZWaveDriverInstance;
+import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
+import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
+import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
 
 public class ZWaveTemperatureAndHumiditySensorDriverInstance
 		extends ZWaveDriverInstance implements TemperatureAndHumiditySensor
 {
 
 	// the class logger
-	private LogHelper logger;
+	private Logger logger;
 
 	// sensor-level update times
 	private long temperatureUpdateTime = 0;
@@ -72,7 +71,7 @@ public class ZWaveTemperatureAndHumiditySensorDriverInstance
 	public ZWaveTemperatureAndHumiditySensorDriverInstance(ZWaveNetwork network,
 			ControllableDevice device, int deviceId, Set<Integer> instancesId,
 			String gatewayEndpoint, int gatewayNodeId, int updateTimeMillis,
-			BundleContext context)
+			Logger logger, BundleContext context)
 	{
 		super(network, device, deviceId, instancesId, gatewayEndpoint,
 				gatewayNodeId, updateTimeMillis, context);
@@ -81,7 +80,7 @@ public class ZWaveTemperatureAndHumiditySensorDriverInstance
 		this.groups = new HashSet<Integer>();
 
 		// create a logger
-		logger = new LogHelper(context);
+		this.logger = logger;
 
 		// initialize states
 		this.initializeStates();
@@ -131,7 +130,7 @@ public class ZWaveTemperatureAndHumiditySensorDriverInstance
 
 		// Read the value for temperature or humidity.
 		CommandClasses ccInst = instanceNode
-				.getCommandClass(ZWaveAPI.COMMAND_CLASS_SENSOR_MULTILEVEL);
+				.getCommandClass(ZWaveRawCommandClass.COMMAND_CLASS_SENSOR_MULTILEVEL);
 
 		// Check if it is a real new value or if it is an old one
 		long globalUpdateTime = ccInst.getValUpdateTime();
@@ -235,7 +234,7 @@ public class ZWaveTemperatureAndHumiditySensorDriverInstance
 		}
 
 		// debug
-		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
+		logger.debug( "Device " + device.getDeviceId()
 				+ " temperature " + temperatureValue.toString());
 
 		this.notifyNewTemperatureValue(temperatureValue);
@@ -260,7 +259,7 @@ public class ZWaveTemperatureAndHumiditySensorDriverInstance
 			this.notifyChangedRelativeHumidity(relativeHumidity);
 
 			// debug
-			logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
+			logger.debug( "Device " + device.getDeviceId()
 					+ " humidity " + relativeHumidity.toString());
 		}
 	}
@@ -373,7 +372,7 @@ public class ZWaveTemperatureAndHumiditySensorDriverInstance
 		// for this device the right Get command class is
 		// COMMAND_CLASS_SENSOR_MULTILEVEL for each instance.
 		HashSet<Integer> ccSet = new HashSet<Integer>();
-		ccSet.add(ZWaveAPI.COMMAND_CLASS_SENSOR_MULTILEVEL);
+		ccSet.add(ZWaveRawCommandClass.COMMAND_CLASS_SENSOR_MULTILEVEL);
 
 		for (Integer instanceId : instancesId)
 		{

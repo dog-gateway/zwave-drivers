@@ -17,6 +17,18 @@
  */
 package it.polito.elite.dog.drivers.zwave.thermostaticradiatorvalve;
 
+import java.io.File;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
+
+import javax.measure.DecimalMeasure;
+import javax.measure.Measure;
+
+import org.osgi.framework.BundleContext;
+import org.osgi.service.log.Logger;
+
 import it.polito.elite.dog.core.library.model.ControllableDevice;
 import it.polito.elite.dog.core.library.model.DeviceStatus;
 import it.polito.elite.dog.core.library.model.climate.ClimateScheduleSwitchPoint;
@@ -28,8 +40,7 @@ import it.polito.elite.dog.core.library.model.state.TemperatureState;
 import it.polito.elite.dog.core.library.model.statevalue.ClimateScheduleStateValue;
 import it.polito.elite.dog.core.library.model.statevalue.StateValue;
 import it.polito.elite.dog.core.library.model.statevalue.TemperatureStateValue;
-import it.polito.elite.dog.core.library.util.LogHelper;
-import it.polito.elite.dog.drivers.zwave.ZWaveAPI;
+import it.polito.elite.dog.drivers.zwave.model.ZWaveRawCommandClass;
 import it.polito.elite.dog.drivers.zwave.model.commandclasses.ThermostatMode;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.CommandClasses;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.CommandClassesData;
@@ -43,28 +54,15 @@ import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
 import it.polito.elite.dog.drivers.zwave.persistence.JSONPersistenceManager;
 
-import java.io.File;
-import java.util.Calendar;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
-
-import javax.measure.DecimalMeasure;
-import javax.measure.Measure;
-
-import org.osgi.framework.BundleContext;
-import org.osgi.service.log.LogService;
-
 /**
  * @author bonino
  * 
  */
-public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
-		implements ThermostaticRadiatorValve
+public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance implements ThermostaticRadiatorValve
 {
 
 	// the class logger
-	private LogHelper logger;
+	private Logger logger;
 
 	// the schedule persistent store
 	private JSONPersistenceManager persistentStore;
@@ -73,16 +71,14 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 	// schedules
 	private boolean isReady;
 
-	public ZWaveThermostaticRadiatorValveInstance(ZWaveNetwork network,
-			ControllableDevice device, int deviceId, Set<Integer> instancesId,
-			String gatewayEndpoint, int gatewayNodeId, int updateTimeMillis,
-			String persistenceStoreDir, BundleContext context)
+	public ZWaveThermostaticRadiatorValveInstance(ZWaveNetwork network, ControllableDevice device, int deviceId,
+			Set<Integer> instancesId, String gatewayEndpoint, int gatewayNodeId, int updateTimeMillis,
+			String persistenceStoreDir, Logger logger, BundleContext context)
 	{
-		super(network, device, deviceId, instancesId, gatewayEndpoint,
-				gatewayNodeId, updateTimeMillis, context);
+		super(network, device, deviceId, instancesId, gatewayEndpoint, gatewayNodeId, updateTimeMillis, context);
 
 		// create a logger
-		this.logger = new LogHelper(context);
+		this.logger = logger;
 
 		// not ready
 		this.isReady = false;
@@ -96,14 +92,12 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 
 			// check if a file associated to the current thermostatic valve
 			// exists
-			String persistentStoreName = persistenceStoreDir + File.separator
-					+ deviceId + "-schedule.json";
+			String persistentStoreName = persistenceStoreDir + File.separator + deviceId + "-schedule.json";
 
 			try
 			{
 				// build a file object pointing at the persistence store
-				this.persistentStore = new JSONPersistenceManager(
-						persistentStoreName);
+				this.persistentStore = new JSONPersistenceManager(persistentStoreName);
 			}
 			catch (Exception e)
 			{
@@ -111,7 +105,7 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 				this.persistentStore = null;
 
 				// warning
-				this.logger.log(LogService.LOG_WARNING,
+				this.logger.warn(
 						"Unable to create/acquire the persistent store for climate schedules, running in-memory only: all changes will be lost upon restart.",
 						e);
 			}
@@ -122,7 +116,7 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 			this.persistentStore = null;
 
 			// warning
-			this.logger.log(LogService.LOG_WARNING,
+			this.logger.warn(
 					"Unable to find the persistent store for climate schedules, running in-memory only: all changes will be lost upon restart.");
 		}
 
@@ -135,8 +129,7 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 	{
 		// get the state values
 		ClimateScheduleStateValue stateValues[] = (ClimateScheduleStateValue[]) this.currentState
-				.getState(ClimateScheduleState.class.getSimpleName())
-				.getCurrentStateValue();
+				.getState(ClimateScheduleState.class.getSimpleName()).getCurrentStateValue();
 
 		// prepare the array of schedules to sync on file
 		DailyClimateSchedule schedules[] = new DailyClimateSchedule[stateValues.length];
@@ -169,8 +162,7 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 		}
 		catch (Exception e)
 		{
-			this.logger.log(LogService.LOG_ERROR,
-					"Unable to save schedule data.", e);
+			this.logger.error("Unable to save schedule data.", e);
 		}
 
 	}
@@ -189,8 +181,7 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 		}
 
 		// set the climate schedule state (covers all the week)
-		currentState.setState(ClimateScheduleState.class.getSimpleName(),
-				new ClimateScheduleState(values));
+		currentState.setState(ClimateScheduleState.class.getSimpleName(), new ClimateScheduleState(values));
 
 		// notify the change
 		this.notifyChangedWeeklyClimateSchedule(dailySchedules);
@@ -205,8 +196,7 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 		}
 		catch (Exception e)
 		{
-			this.logger.log(LogService.LOG_ERROR,
-					"Unable to save schedule data.", e);
+			this.logger.error("Unable to save schedule data.", e);
 		}
 
 	}
@@ -219,16 +209,14 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 
 		// get the current state value registered as values of the climate
 		// schedule state
-		StateValue[] states = this.currentState
-				.getState(ClimateScheduleState.class.getSimpleName())
+		StateValue[] states = this.currentState.getState(ClimateScheduleState.class.getSimpleName())
 				.getCurrentStateValue();
 
 		// look for the state value associated to the given weekday
 		for (int i = 0; i < states.length; i++)
 		{
 			// get the current daily schedule
-			DailyClimateSchedule schedule = (DailyClimateSchedule) ((ClimateScheduleStateValue) states[i])
-					.getValue();
+			DailyClimateSchedule schedule = (DailyClimateSchedule) ((ClimateScheduleStateValue) states[i]).getValue();
 
 			// if the schedule is the one searched for
 			if (schedule.getWeekDay() == weekDay)
@@ -253,8 +241,7 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 		for (Integer instanceId : nodeInfo.getInstanceSet())
 			if (this.handler != null)
 				this.handler.write(nodeInfo.getDeviceNodeId(), instanceId,
-						ZWaveAPI.COMMAND_CLASS_THERMOSTAT_MODE,
-						"" + ThermostatMode.MODE_COOL);
+						ZWaveRawCommandClass.COMMAND_CLASS_THERMOSTAT_MODE, "" + ThermostatMode.MODE_COOL);
 
 		// notify
 		this.notifyCool();
@@ -268,8 +255,7 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 		for (Integer instanceId : nodeInfo.getInstanceSet())
 			if (this.handler != null)
 				this.handler.write(nodeInfo.getDeviceNodeId(), instanceId,
-						ZWaveAPI.COMMAND_CLASS_THERMOSTAT_MODE,
-						"" + ThermostatMode.MODE_OFF);
+						ZWaveRawCommandClass.COMMAND_CLASS_THERMOSTAT_MODE, "" + ThermostatMode.MODE_OFF);
 
 		// notify
 		this.notifyStoppedHeatingOrCooling();
@@ -284,7 +270,7 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 		for (Integer instanceId : nodeInfo.getInstanceSet())
 			if (this.handler != null)
 				this.handler.write(nodeInfo.getDeviceNodeId(), instanceId,
-						ZWaveAPI.COMMAND_CLASS_THERMOSTAT_SETPOINT,
+						ZWaveRawCommandClass.COMMAND_CLASS_THERMOSTAT_SETPOINT,
 						ThermostatMode.MODE_HEAT + "," + celsius);
 	}
 
@@ -299,8 +285,7 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 		for (Integer instanceId : nodeInfo.getInstanceSet())
 			if (this.handler != null)
 				this.handler.write(nodeInfo.getDeviceNodeId(), instanceId,
-						ZWaveAPI.COMMAND_CLASS_THERMOSTAT_MODE,
-						"" + ThermostatMode.MODE_HEAT);
+						ZWaveRawCommandClass.COMMAND_CLASS_THERMOSTAT_MODE, "" + ThermostatMode.MODE_HEAT);
 
 		// notify
 		this.notifyHeat();
@@ -314,8 +299,7 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 	}
 
 	@Override
-	public void newMessageFromHouse(Device deviceNode, Instance instanceNode,
-			Controller controllerNode, String sValue)
+	public void newMessageFromHouse(Device deviceNode, Instance instanceNode, Controller controllerNode, String sValue)
 	{
 		// check ready
 		if (this.isReady)
@@ -324,12 +308,11 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 			this.deviceNode = deviceNode;
 
 			// get the thermostat set point command class data
-			CommandClasses thermostatCC = instanceNode.getCommandClass(
-					ZWaveAPI.COMMAND_CLASS_THERMOSTAT_SETPOINT);
+			CommandClasses thermostatCC = instanceNode
+					.getCommandClass(ZWaveRawCommandClass.COMMAND_CLASS_THERMOSTAT_SETPOINT);
 
 			// get the last update time if any (from the set point)
-			DataElemObject setPointElem = thermostatCC.getCommandClassesData()
-					.getAllData().get("1");
+			DataElemObject setPointElem = thermostatCC.getCommandClassesData().getAllData().get("1");
 			long globalUpdateTime = setPointElem.getUpdateTime();
 
 			// check if the instance contains only one value
@@ -342,37 +325,29 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 					this.lastUpdateTime = globalUpdateTime;
 
 					// read the current set point
-					double setPoint = ((Number) setPointElem
-							.getDataElemValue(CommandClassesData.FIELD_VAL))
-									.doubleValue();
+					double setPoint = ((Number) setPointElem.getDataElemValue(CommandClassesData.FIELD_VAL))
+							.doubleValue();
 
 					// read the current unit of measure
-					String unitOfMeasure = (String) thermostatCC
-							.getCommandClassesData().getAllData().get("1")
-							.getDataElemValue(
-									CommandClassesData.FIELD_SCALESTRING);
+					String unitOfMeasure = (String) thermostatCC.getCommandClassesData().getAllData().get("1")
+							.getDataElemValue(CommandClassesData.FIELD_SCALESTRING);
 
 					// trim the scale string
 					unitOfMeasure = unitOfMeasure.replace("grd", "");
 					unitOfMeasure = unitOfMeasure.trim();
 
 					// convert to a decimal measure
-					DecimalMeasure<?> setPointTemperature = DecimalMeasure
-							.valueOf(setPoint + " " + unitOfMeasure);
+					DecimalMeasure<?> setPointTemperature = DecimalMeasure.valueOf(setPoint + " " + unitOfMeasure);
 
 					TemperatureStateValue setPointStateValue = new TemperatureStateValue();
 					setPointStateValue.setValue(setPointTemperature);
-					TemperatureState setPointState = new TemperatureState(
-							setPointStateValue);
+					TemperatureState setPointState = new TemperatureState(setPointStateValue);
 
 					// update the inner set point state
-					this.currentState.setState(
-							TemperatureState.class.getSimpleName(),
-							setPointState);
+					this.currentState.setState(TemperatureState.class.getSimpleName(), setPointState);
 
 					// notify the temperature change
-					this.notifyChangedDesiredTemperatureSetting(
-							setPointTemperature);
+					this.notifyChangedDesiredTemperatureSetting(setPointTemperature);
 
 					// notify the new state
 					this.updateStatus();
@@ -411,14 +386,13 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 	}
 
 	@Override
-	protected ZWaveNodeInfo createNodeInfo(int deviceId,
-			Set<Integer> instancesId, boolean isController)
+	protected ZWaveNodeInfo createNodeInfo(int deviceId, Set<Integer> instancesId, boolean isController)
 	{
 		HashMap<Integer, Set<Integer>> instanceCommand = new HashMap<Integer, Set<Integer>>();
 
 		HashSet<Integer> ccSet = new HashSet<Integer>();
 		// ccSet.add(ZWaveAPI.COMMAND_CLASS_CLIMATE_CONTROL_SCHEDULE);
-		ccSet.add(ZWaveAPI.COMMAND_CLASS_THERMOSTAT_SETPOINT);
+		ccSet.add(ZWaveRawCommandClass.COMMAND_CLASS_THERMOSTAT_SETPOINT);
 		// ccSet.add(ZWaveAPI.COMMAND_CLASS_THERMOSTAT_MODE);
 
 		for (Integer instanceId : instancesId)
@@ -426,8 +400,7 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 			instanceCommand.put(instanceId, ccSet);
 		}
 
-		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(this.gatewayEndpoint,
-				deviceId, instanceCommand, isController);
+		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(this.gatewayEndpoint, deviceId, instanceCommand, isController);
 
 		return nodeInfo;
 	}
@@ -449,8 +422,7 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 				{
 
 					// if exists, load the stored schedules
-					schedules = persistentStore
-							.load(DailyClimateSchedule[].class);
+					schedules = persistentStore.load(DailyClimateSchedule[].class);
 
 				}
 				else
@@ -478,9 +450,7 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 				}
 
 				// set the climate schedule state (covers all the week)
-				currentState.setState(
-						ClimateScheduleState.class.getSimpleName(),
-						new ClimateScheduleState(values));
+				currentState.setState(ClimateScheduleState.class.getSimpleName(), new ClimateScheduleState(values));
 
 				// initialize the temperature state
 				currentState.setState(TemperatureState.class.getSimpleName(),
@@ -509,28 +479,23 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 
 			// get the stored switch points
 			ClimateScheduleStateValue[] allScheduledSwitchPoints = (ClimateScheduleStateValue[]) this.currentState
-					.getState(ClimateScheduleState.class.getSimpleName())
-					.getCurrentStateValue();
+					.getState(ClimateScheduleState.class.getSimpleName()).getCurrentStateValue();
 
 			// iterate over the switch points
 			for (int i = 0; i < allScheduledSwitchPoints.length; i++)
 			{
 				// get the day schedule
-				DailyClimateSchedule schedule = (DailyClimateSchedule) allScheduledSwitchPoints[i]
-						.getValue();
+				DailyClimateSchedule schedule = (DailyClimateSchedule) allScheduledSwitchPoints[i].getValue();
 
-				if (schedule.getWeekDay() == clockTick
-						.get(Calendar.DAY_OF_WEEK))
+				if (schedule.getWeekDay() == clockTick.get(Calendar.DAY_OF_WEEK))
 				{
 
 					// get the switch point
-					ClimateScheduleSwitchPoint switchPoint = schedule
-							.getSwitchPoint(clockTick);
+					ClimateScheduleSwitchPoint switchPoint = schedule.getSwitchPoint(clockTick);
 
 					// set the new set point if available
 					if (switchPoint != null)
-						this.setTemperatureAt(
-								switchPoint.desiredTemperatureAsMeasure());
+						this.setTemperatureAt(switchPoint.desiredTemperatureAsMeasure());
 
 					// break as no more switch points can be activated for this
 					// instant of time
@@ -542,19 +507,15 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 	}
 
 	@Override
-	public void notifyChangedDailyClimateSchedule(
-			DailyClimateSchedule daySchedule)
+	public void notifyChangedDailyClimateSchedule(DailyClimateSchedule daySchedule)
 	{
-		((ThermostaticRadiatorValve) this.device)
-				.notifyChangedDailyClimateSchedule(daySchedule);
+		((ThermostaticRadiatorValve) this.device).notifyChangedDailyClimateSchedule(daySchedule);
 	}
 
 	@Override
-	public void notifyChangedDesiredTemperatureSetting(
-			Measure<?, ?> newTemperatureValue)
+	public void notifyChangedDesiredTemperatureSetting(Measure<?, ?> newTemperatureValue)
 	{
-		((ThermostaticRadiatorValve) this.device)
-				.notifyChangedDesiredTemperatureSetting(newTemperatureValue);
+		((ThermostaticRadiatorValve) this.device).notifyChangedDesiredTemperatureSetting(newTemperatureValue);
 	}
 
 	@Override
@@ -570,25 +531,21 @@ public class ZWaveThermostaticRadiatorValveInstance extends ZWaveDriverInstance
 	}
 
 	@Override
-	public void notifyChangedWeeklyClimateSchedule(
-			DailyClimateSchedule[] dailySchedules)
+	public void notifyChangedWeeklyClimateSchedule(DailyClimateSchedule[] dailySchedules)
 	{
-		((ThermostaticRadiatorValve) this.device)
-				.notifyChangedWeeklyClimateSchedule(dailySchedules);
+		((ThermostaticRadiatorValve) this.device).notifyChangedWeeklyClimateSchedule(dailySchedules);
 	}
 
 	@Override
 	public void notifyStoppedHeatingOrCooling()
 	{
-		((ThermostaticRadiatorValve) this.device)
-				.notifyStoppedHeatingOrCooling();
+		((ThermostaticRadiatorValve) this.device).notifyStoppedHeatingOrCooling();
 	}
 
 	@Override
 	public Measure<?, ?> getSetpointTemperature()
 	{
-		return (Measure<?, ?>) this.currentState
-				.getState(TemperatureState.class.getSimpleName())
+		return (Measure<?, ?>) this.currentState.getState(TemperatureState.class.getSimpleName())
 				.getCurrentStateValue()[0].getValue();
 	}
 

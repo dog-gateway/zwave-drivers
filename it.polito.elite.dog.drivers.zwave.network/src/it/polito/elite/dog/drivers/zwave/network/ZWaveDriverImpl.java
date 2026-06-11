@@ -19,14 +19,15 @@ package it.polito.elite.dog.drivers.zwave.network;
 
 import java.util.Dictionary;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.cm.ConfigurationException;
 import org.osgi.service.cm.ManagedService;
-import org.osgi.service.log.LogService;
+import org.osgi.service.log.Logger;
+import org.osgi.service.log.LoggerFactory;
 
-import it.polito.elite.dog.core.library.util.LogHelper;
 import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
@@ -52,7 +53,8 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 	private ServiceRegistration<?> regServiceZWaveDriverImpl;
 
 	// the driver logger
-	private LogHelper logger;
+	private Logger logger;
+	private AtomicReference<LoggerFactory> loggerFactory;
 
 	// the baseline pollingTime
 	private int pollingTimeMillis;
@@ -70,6 +72,9 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 
 		// set the autodiscovery initially at true
 		this.autoDiscovery = false;
+		
+		// the logger atomic reference
+		this.loggerFactory = new AtomicReference<LoggerFactory>();
 	}
 
 	/*
@@ -82,8 +87,7 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 		// get the bundle configuration parameters
 		if (properties != null)
 		{
-			logger.log(LogService.LOG_DEBUG,
-					"Received configuration properties");
+			this.logger.info("Received configuration properties");
 
 			// try to get the baseline polling time
 			String pollingTimeAsString = (String) properties
@@ -160,13 +164,12 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 	 */
 	protected void activate(BundleContext bundleContext)
 	{
-		// create a logger
-		logger = new LogHelper(bundleContext);
-
+        this.logger.debug("activating Zwave Network Driver...");
+        
 		// store the bundle context
 		this.bundleContext = bundleContext;
-
-		logger.log(LogService.LOG_DEBUG, "Activated: ZWave NetworkDriver...");
+		
+		this.logger.info("Zwave Network Driver activated!");
 	}
 
 	/**
@@ -271,14 +274,42 @@ public class ZWaveDriverImpl implements ZWaveNetwork, ManagedService
 		if (handler != null)
 			handler.removeDriver(driver);
 	}
+	
+	 /**
+     * Handle binding of the {@link LoggerFactory} service needed to log
+     * diagnostic messages.
+     * 
+     * @param loggerFactory
+     *            The {@link LoggerFactory} instance available in the framework.
+     */
+    public void addedLoggerFactory(LoggerFactory loggerFactory)
+    {
+        // store the logger factory
+        this.loggerFactory.set(loggerFactory);
+        // create the logger
+        this.logger = loggerFactory.getLogger(ZWaveDriverImpl.class);
+    }
+
+    /**
+     * Handle un-binding of the {@link LoggerFactory} service needed to log
+     * diagnostic messages.
+     * 
+     * @param loggerFactory
+     *            The {@link LoggerFactory} service that became unavailable.
+     */
+    public void removedLoggerFactory(LoggerFactory loggerFactory)
+    {
+        if (this.loggerFactory.compareAndSet(loggerFactory, null))
+        {
+            this.logger = null;
+        }
+    }
 
 	/**
-	 * Provides a reference to the {@link LogService} instance used by this
-	 * class to log messages...
-	 * 
-	 * @return
+	 * Returns the bundle-wide logger, bound to the OSGi LogService in use
+	 * @return The logger, may be null if not set
 	 */
-	public LogHelper getLogger()
+	public Logger getLogger()
 	{
 		return logger;
 	}

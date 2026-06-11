@@ -30,8 +30,7 @@ import it.polito.elite.dog.core.library.model.state.OnOffState;
 import it.polito.elite.dog.core.library.model.state.State;
 import it.polito.elite.dog.core.library.model.statevalue.OffStateValue;
 import it.polito.elite.dog.core.library.model.statevalue.OnStateValue;
-import it.polito.elite.dog.core.library.util.LogHelper;
-import it.polito.elite.dog.drivers.zwave.ZWaveAPI;
+import it.polito.elite.dog.drivers.zwave.model.ZWaveRawCommandClass;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.CommandClasses;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.Controller;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.Device;
@@ -70,8 +69,6 @@ public class ZWaveOnOffDeviceDriverInstance extends ZWaveDriverInstance
 		this.groups = new HashSet<Integer>();
 		this.scenes = new HashSet<Integer>();
 
-		new LogHelper(context);
-
 		// initialize states
 		this.initializeStates();
 	}
@@ -108,7 +105,7 @@ public class ZWaveOnOffDeviceDriverInstance extends ZWaveDriverInstance
 
 		// Read the value associated with the right CommandClass.
 		CommandClasses ccEntry = instanceNode
-				.getCommandClass(ZWaveAPI.COMMAND_CLASS_SWITCH_BINARY);
+				.getCommandClass(ZWaveRawCommandClass.COMMAND_CLASS_SWITCH_BINARY);
 
 		// Check if it is a real new value or if it is an old one
 		if (ccEntry != null)
@@ -273,7 +270,7 @@ public class ZWaveOnOffDeviceDriverInstance extends ZWaveDriverInstance
 		for (Integer instanceId : nodeInfo.getInstanceSet())
 			if (this.handler != null)
 				this.handler.write(nodeInfo.getDeviceNodeId(), instanceId,
-						ZWaveAPI.COMMAND_CLASS_SWITCH_BINARY, "255");
+						ZWaveRawCommandClass.COMMAND_CLASS_SWITCH_BINARY, "255");
 	}
 
 	@Override
@@ -283,7 +280,7 @@ public class ZWaveOnOffDeviceDriverInstance extends ZWaveDriverInstance
 		for (Integer instanceId : nodeInfo.getInstanceSet())
 			if (this.handler != null)
 				this.handler.write(nodeInfo.getDeviceNodeId(), instanceId,
-						ZWaveAPI.COMMAND_CLASS_SWITCH_BINARY, "0");
+						ZWaveRawCommandClass.COMMAND_CLASS_SWITCH_BINARY, "0");
 	}
 
 	@Override
@@ -293,7 +290,7 @@ public class ZWaveOnOffDeviceDriverInstance extends ZWaveDriverInstance
 		HashMap<Integer, Set<Integer>> instanceCommand = new HashMap<Integer, Set<Integer>>();
 
 		HashSet<Integer> ccSet = new HashSet<Integer>();
-		ccSet.add(ZWaveAPI.COMMAND_CLASS_SWITCH_BINARY);
+		ccSet.add(ZWaveRawCommandClass.COMMAND_CLASS_SWITCH_BINARY);
 
 		// binary switch has its own command class
 		for (Integer instanceId : instancesId)

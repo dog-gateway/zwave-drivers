@@ -70,15 +70,6 @@ public abstract class ZWaveDriverInstance implements StatefulDevice
 	// If only one instance is present, instanceId = 0
 	protected Device deviceNode;
 
-	// zway data associated with this instance
-	// protected Instance instanceNode;
-
-	// // the port of the endpoint address
-	// protected String gwPort;
-
-	// the datapoints managed by this driver
-	// protected Set<ModbusRegisterInfo> managedRegisters;
-
 	// the datapoint to notifications map
 	protected Map<ZWaveNodeInfo, Set<CNParameters>> register2Notification;
 
@@ -138,9 +129,6 @@ public abstract class ZWaveDriverInstance implements StatefulDevice
 		// store update time
 		this.updateTimeMillis = updateTimeMillis;
 
-		// store the id of the device
-		// nodeInfo = new ZWaveNodeInfo(deviceId, instancesId, isController());
-
 		// Create the nodeInfo object. It defines nodeId, instancesId and Get
 		// command class
 		nodeInfo = createNodeInfo(deviceId, instancesId, isController());
@@ -151,10 +139,6 @@ public abstract class ZWaveDriverInstance implements StatefulDevice
 		// create the map to associate commands and datapoints
 		command2Register = new ConcurrentHashMap<CNParameters, ZWaveNodeInfo>();
 
-		//
-		// // create the set for storing the managed datapoints
-		// this.managedRegisters = new HashSet<ModbusRegisterInfo>();
-
 		// fill the data structures depending on the specific device
 		// configuration parameters
 		fillConfiguration();
@@ -163,7 +147,6 @@ public abstract class ZWaveDriverInstance implements StatefulDevice
 		specificConfiguration();
 
 		// associate the device-specific driver to the network driver
-		// for (ModbusRegisterInfo register : this.managedRegisters)
 		this.handler = addToNetworkDriver(nodeInfo);
 	}
 

@@ -38,8 +38,7 @@ import org.osgi.service.event.EventHandler;
  * @author bonino
  * 
  */
-public class ZWaveThermostaticRadiatorValveDriver extends ZWaveDeviceDriver
-		implements EventHandler
+public class ZWaveThermostaticRadiatorValveDriver extends ZWaveDeviceDriver implements EventHandler
 {
 
 	// the persistence store associated to this driver
@@ -55,25 +54,21 @@ public class ZWaveThermostaticRadiatorValveDriver extends ZWaveDeviceDriver
 	}
 
 	@Override
-	public ZWaveDriverInstance createZWaveDriverInstance(
-			ZWaveNetwork zWaveNetwork, ControllableDevice device, int nodeId,
-			HashSet<Integer> instancesId, String gatewayEndpoint,
-			int gatewayNodeId, int updateTimeMillis, BundleContext context)
+	public ZWaveDriverInstance createZWaveDriverInstance(ZWaveNetwork zWaveNetwork, ControllableDevice device,
+			int nodeId, HashSet<Integer> instancesId, String gatewayEndpoint, int gatewayNodeId, int updateTimeMillis,
+			BundleContext context)
 	{
-		return new ZWaveThermostaticRadiatorValveInstance(zWaveNetwork, device,
-				nodeId, instancesId, gatewayEndpoint, gatewayNodeId,
-				updateTimeMillis, this.persistenceStoreDirectory, context);
+		return new ZWaveThermostaticRadiatorValveInstance(zWaveNetwork, device, nodeId, instancesId, gatewayEndpoint,
+				gatewayNodeId, updateTimeMillis, this.persistenceStoreDirectory, this.logger, context);
 	}
 
 	@Override
-	public void updated(Dictionary<String, ?> properties)
-			throws ConfigurationException
+	public void updated(Dictionary<String, ?> properties) throws ConfigurationException
 	{
 		if (properties != null)
 		{
 			// try to get the persistence store directory
-			String persistenceDir = (String) properties
-					.get(ZWaveInfo.PROPERTY_PERSISTENT_STORE);
+			String persistenceDir = (String) properties.get(ZWaveInfo.PROPERTY_PERSISTENT_STORE);
 
 			// trim leading and trailing spaces
 			persistenceDir = persistenceDir.trim();
@@ -85,11 +80,9 @@ public class ZWaveThermostaticRadiatorValveDriver extends ZWaveDeviceDriver
 				this.persistenceStoreDirectory = persistenceDir;
 
 				// check absolute vs relative
-				File persistenceStoreDir = new File(
-						this.persistenceStoreDirectory);
+				File persistenceStoreDir = new File(this.persistenceStoreDirectory);
 				if (!persistenceStoreDir.isAbsolute())
-					this.persistenceStoreDirectory = System
-							.getProperty("configFolder") + "/"
+					this.persistenceStoreDirectory = System.getProperty("configFolder") + "/"
 							+ this.persistenceStoreDirectory;
 			}
 
@@ -116,13 +109,10 @@ public class ZWaveThermostaticRadiatorValveDriver extends ZWaveDeviceDriver
 					synchronized (managedInstances)
 					{
 						// dispatch the event content
-						for (ZWaveDriverInstance driverInstance : managedInstances
-								.values())
+						for (ZWaveDriverInstance driverInstance : managedInstances.values())
 						{
 							((ZWaveThermostaticRadiatorValveInstance) driverInstance)
-									.checkTime(
-											((ClockTimeNotification) eventContent)
-													.getClockTick());
+									.checkTime(((ClockTimeNotification) eventContent).getClockTick());
 						}
 					}
 

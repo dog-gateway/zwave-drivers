@@ -13,10 +13,10 @@ import java.util.concurrent.Executors;
 
 import org.osgi.framework.Version;
 import org.osgi.service.log.LogService;
+import org.osgi.service.log.Logger;
 
 import it.polito.elite.dog.core.library.model.ControllableDevice;
-import it.polito.elite.dog.core.library.util.LogHelper;
-import it.polito.elite.dog.drivers.zwave.ZWaveAPI;
+import it.polito.elite.dog.drivers.zwave.model.ZWaveRawCommandClass;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.Controller;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.Device;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.Instance;
@@ -52,7 +52,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 	private String password;
 
 	// the LogHelper needed to log events
-	private LogHelper logger;
+	private Logger logger;
 
 	// connection manager used to deal with a specific z-way server, associated
 	// with the given url.
@@ -61,24 +61,28 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 	// model tree representing the system
 	private ZWaveModelTree modelTree;
 
-	// the register to driver map
+	// the nodeInfo to Driver map
 	private ConcurrentHashMap<ZWaveNodeInfo, ZWaveDriverInstance> nodeInfo2Driver;
 
 	// the inverse map
 	// Please notice that on the basis of the driver instance definition a
 	// single ZWaveDriverInstance will never handle more than one z-wave node.
+	// Therefore using a map here is likely overkill. 
 	private ConcurrentHashMap<ZWaveDriverInstance, ZWaveNodeInfo> driver2NodeInfo;
 
-	// the zwave poller
+	// the zwave poller thread
 	private ZWavePoller poller;
 
 	// the baseline pollingTime adopted if no server-specific setting is given
 	private int pollingTimeMillis = ZWaveNetworkHandlerImpl.DEFAULT_POLLING_TIME_MILLIS;
 
-	// the autoDiscovery flag
+	// the autoDiscovery flag, if set at true, the driver discovers devices on the
+	// zwave network and attempts to create proper configuration for them. Once done, the
+	// SimpleHouseModel bundle will instantiate the discovered devices, update the configuration file, and expose
+	// them in the OSGI framework. In turn, this will trigger device attachment by device-specific drivers.
 	private boolean autoDiscovery;
 
-	// Version information to handle the version patch
+	// Version information to handle version patches, when needed
 	private Version version;
 
 	// the auto-discovery listener
@@ -92,7 +96,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 	 */
 	public ZWaveNetworkHandlerImpl(String gatewayEndpointURL, String username,
 			String password, int pollingTimeMillis, boolean autoDiscovery,
-			LogHelper logger)
+			Logger logger)
 	{
 		// TODO add checks for needed values
 		// store the instance variables
@@ -106,7 +110,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 
 		// the notification service for unknown devices
 		// TODO: check whether a single thread working off an unbounded queue is
-		// sufficient
+		// sufficient - may raise memory issues if the number of discovered devices is high
 		this.deviceNotificationService = Executors.newSingleThreadExecutor();
 
 		/*--- Bi-directional hash map, naive implementation ----*/
@@ -134,7 +138,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 			poller.start();
 
 			// log the driver start
-			logger.log(LogService.LOG_INFO, ZWaveDriverImpl.LOG_ID
+			this.logger.info(ZWaveDriverImpl.LOG_ID
 					+ "Started the driver poller thread...");
 		}
 
@@ -146,7 +150,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 	 * 
 	 * @return
 	 */
-	public LogHelper getLogger()
+	public Logger getLogger()
 	{
 		return this.logger;
 	}
@@ -194,14 +198,14 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 						.get(nodeInfo.getDeviceNodeId());
 				Device device = this.modelTree.getDevices()
 						.get(nodeInfo.getDeviceNodeId());
-				// device can be null if house xml configuration is wrong
+				// device can be null if the home configuration is wrong
 				if (device != null)
 				{
 					for (Integer instanceId : nodeInfo.getInstanceSet())
 					{
 						instanceNode = device.getInstances().get(instanceId);
 
-						// instance can be null if house xml configuration is
+						// instance can be null if home configuration is
 						// wrong
 						if (instanceNode != null)
 						{
@@ -215,7 +219,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 							// in this case the device is configured in dog, but
 							// it is no more available on the zwave network,
 							// therefore it should be removed.
-							logger.log(LogService.LOG_ERROR,
+							logger.error(ZWaveDriverImpl.LOG_ID+
 									"Device id: " + nodeInfo.getDeviceNodeId()
 											+ " instance id: " + instanceId
 											+ " does not exists!");
@@ -226,13 +230,13 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 				}
 				else
 				{
-					logger.log(LogService.LOG_ERROR, "Device id: "
+					logger.error(ZWaveDriverImpl.LOG_ID+ "Device id: "
 							+ nodeInfo.getDeviceNodeId() + " does not exists!");
 				}
 			}
 			catch (Exception e)
 			{
-				logger.log(LogService.LOG_ERROR, "Error: ", e);
+				logger.error(ZWaveDriverImpl.LOG_ID+ "Error: ", e);
 
 			}
 		}
@@ -270,7 +274,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 							.get("softwareRevisionVersion").getValue();
 					versionAsString = versionAsString.trim().substring(1);
 					this.version = new Version(versionAsString);
-					logger.log(LogService.LOG_INFO,
+					logger.info(ZWaveDriverImpl.LOG_ID+
 							"ZWay version:" + this.version);
 				}
 
@@ -286,7 +290,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 			}
 			catch (Exception e)
 			{
-				logger.log(LogService.LOG_ERROR,
+				logger.error(ZWaveDriverImpl.LOG_ID+
 						"Unable to update devices due to exception:", e);
 
 			}
@@ -322,7 +326,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 					}
 					catch (Exception e)
 					{
-						logger.log(LogService.LOG_ERROR, "Can't send command",
+						logger.error(ZWaveDriverImpl.LOG_ID+ "Can't send command",
 								e);
 
 					}
@@ -347,7 +351,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 		Set<Integer> lstInstanceNodeId = nodeInfo.getInstanceSet();
 
 		// info on port usage
-		logger.log(LogService.LOG_INFO, "Using deviceId: " + deviceNodeId
+		logger.info(ZWaveDriverImpl.LOG_ID+ "Using deviceId: " + deviceNodeId
 				+ " instancesId: " + lstInstanceNodeId.toString());
 
 		// adds a given register-driver association
@@ -441,7 +445,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 			// version > 1.3.1 patch
 			if (this.version.compareTo(new Version("1.3.1")) > 0)
 			{
-				if (nCommandClass == ZWaveAPI.GENERIC_TYPE_SWITCH_BINARY)
+				if (nCommandClass == ZWaveRawCommandClass.GENERIC_TYPE_SWITCH_BINARY)
 				{
 					if (commandValue.equals("255"))
 						commandValue = "true";
@@ -456,7 +460,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 		}
 		catch (Exception e)
 		{
-			logger.log(LogService.LOG_ERROR, "Can't send command", e);
+			logger.error(ZWaveDriverImpl.LOG_ID+ "Can't send command", e);
 
 		}
 
@@ -470,7 +474,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 		}
 		catch (Exception e)
 		{
-			logger.log(LogService.LOG_ERROR, "Can't send command", e);
+			logger.error(ZWaveDriverImpl.LOG_ID+ "Can't send command", e);
 
 		}
 	}
@@ -491,7 +495,7 @@ public class ZWaveNetworkHandlerImpl implements ZWaveNetworkHandler
 	 */
 	public Device getRawDevice(int nodeId)
 	{
-		return this.modelTree.getDevices().get(new Integer(nodeId));
+		return this.modelTree.getDevices().get(Integer.valueOf(nodeId));
 	}
 
 	/**

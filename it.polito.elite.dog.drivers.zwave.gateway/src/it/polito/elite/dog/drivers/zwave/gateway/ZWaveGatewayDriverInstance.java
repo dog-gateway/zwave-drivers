@@ -17,6 +17,15 @@
  */
 package it.polito.elite.dog.drivers.zwave.gateway;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.osgi.framework.BundleContext;
+import org.osgi.service.log.Logger;
+
 import it.polito.elite.dog.core.devicefactory.api.DeviceFactory;
 import it.polito.elite.dog.core.library.model.ControllableDevice;
 import it.polito.elite.dog.core.library.model.DeviceDescriptor;
@@ -29,8 +38,7 @@ import it.polito.elite.dog.core.library.model.state.State;
 import it.polito.elite.dog.core.library.model.statevalue.AssociatingStateValue;
 import it.polito.elite.dog.core.library.model.statevalue.DisassociatingStateValue;
 import it.polito.elite.dog.core.library.model.statevalue.IdleStateValue;
-import it.polito.elite.dog.core.library.util.LogHelper;
-import it.polito.elite.dog.drivers.zwave.ZWaveAPI;
+import it.polito.elite.dog.drivers.zwave.model.ZWaveRawCommandClass;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.Controller;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.DataConst;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.Device;
@@ -43,20 +51,10 @@ import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveDiscoveryListen
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
 import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.osgi.framework.BundleContext;
-import org.osgi.service.log.LogService;
-
-public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
-		implements ZWaveGateway, ZWaveDiscoveryListener
+public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance implements ZWaveGateway, ZWaveDiscoveryListener
 {
 	// the driver logger
-	LogHelper logger;
+	Logger logger;
 
 	// the log identifier, unique for the class
 	public static String LOG_ID = "[ZWaveGatewayDriverInstance]: ";
@@ -91,34 +89,31 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 	// the username to access the gateway, if any
 	private String username;
 
-	public ZWaveGatewayDriverInstance(ZWaveNetwork network,
-			DeviceFactory deviceFactory, ControllableDevice controllableDevice,
-			int nodeId, Set<Integer> instancesId, BundleContext context)
+	public ZWaveGatewayDriverInstance(ZWaveNetwork network, DeviceFactory deviceFactory,
+			ControllableDevice controllableDevice, int nodeId, Set<Integer> instancesId, Logger logger,
+			BundleContext context)
 	{
 		// gateway driver node contains always multiple instanceId, but only the
 		// one with Id = 0 contains interesting data
 		// also updateTimeMillis = 0 is fixed to zero because we are not
 		// interested din this kind of behavior fot the gateway
-		super(network, controllableDevice, nodeId, instancesId, null, nodeId, 0,
-				context);
+		super(network, controllableDevice, nodeId, instancesId, null, nodeId, 0, context);
 
 		// store the device factory reference
 		this.deviceFactory = deviceFactory;
 
 		// create a logger
-		logger = new LogHelper(context);
+		this.logger = logger;
 
 		// create the device descriptor factory
 		try
 		{
-			this.descriptorFactory = new DeviceDescriptorFactory(
-					context.getBundle().getEntry("/deviceTemplates"));
+			this.descriptorFactory = new DeviceDescriptorFactory(context.getBundle().getEntry("/deviceTemplates"));
 		}
 		catch (Exception e)
 		{
 
-			this.logger.log(LogService.LOG_ERROR,
-					"Error while creating DeviceDescriptorFactory ", e);
+			this.logger.error("Error while creating DeviceDescriptorFactory ", e);
 		}
 
 		// create a new device state (according to the current DogOnt model, no
@@ -187,8 +182,8 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 		String ip = null;
 		String port = null;
 		// get the gateway address
-		Set<String> ipAddressAsSet = this.device.getDeviceDescriptor()
-				.getSimpleConfigurationParams().get(ZWaveInfo.IP_ADDRESS);
+		Set<String> ipAddressAsSet = this.device.getDeviceDescriptor().getSimpleConfigurationParams()
+				.get(ZWaveInfo.IP_ADDRESS);
 		// if not null, store it
 		if ((ipAddressAsSet != null) && (!ipAddressAsSet.isEmpty()))
 		{
@@ -197,8 +192,7 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 		}
 
 		// get the gateway port
-		Set<String> portAsSet = this.device.getDeviceDescriptor()
-				.getSimpleConfigurationParams().get(ZWaveInfo.PORT);
+		Set<String> portAsSet = this.device.getDeviceDescriptor().getSimpleConfigurationParams().get(ZWaveInfo.PORT);
 		// if not null, store it
 		if ((portAsSet != null) && (!portAsSet.isEmpty()))
 		{
@@ -207,8 +201,8 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 		}
 
 		// get the gateway port
-		Set<String> passwordAsSet = this.device.getDeviceDescriptor()
-				.getSimpleConfigurationParams().get(ZWaveInfo.PASSWORD);
+		Set<String> passwordAsSet = this.device.getDeviceDescriptor().getSimpleConfigurationParams()
+				.get(ZWaveInfo.PASSWORD);
 		// if not null, store it
 		if ((passwordAsSet != null) && (!passwordAsSet.isEmpty()))
 		{
@@ -217,8 +211,8 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 		}
 
 		// get the gateway port
-		Set<String> usernameAsSet = this.device.getDeviceDescriptor()
-				.getSimpleConfigurationParams().get(ZWaveInfo.USERNAME);
+		Set<String> usernameAsSet = this.device.getDeviceDescriptor().getSimpleConfigurationParams()
+				.get(ZWaveInfo.USERNAME);
 		// if not null, store it
 		if ((usernameAsSet != null) && (!usernameAsSet.isEmpty()))
 		{
@@ -250,47 +244,41 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 	{
 		// generate a new network handler for thge gateway represented by this
 		// driver
-		ZWaveNetworkHandler zwHandler = network.addDriver(nodeInfo, 0, this,
-				this.username, this.password);
+		ZWaveNetworkHandler zwHandler = network.addDriver(nodeInfo, 0, this, this.username, this.password);
 		// register the driver as a listener for ZWNetwork changes
 		zwHandler.addZWaveDiscoveryListener(this);
-		
-		//return the create ZWaveNetwork handler
+
+		// return the create ZWaveNetwork handler
 		return zwHandler;
 	}
 
 	@Override
-	public void newMessageFromHouse(Device deviceNode, Instance instanceNode,
-			Controller controllerNode, String sValue)
+	public void newMessageFromHouse(Device deviceNode, Instance instanceNode, Controller controllerNode, String sValue)
 	{
 		this.controller = controllerNode;
-		
+
 		/*-------------- HANDLE ASSOCIATION ------------------------*/
 		// check if dynamic device detection is enabled
 		if (detectionEnabled)
 		{
 			// check if any new device has been recently associated
-			int lastIncludedDeviceAtController = controller.getData()
-					.getLastIncludedDevice();
+			int lastIncludedDeviceAtController = controller.getData().getLastIncludedDevice();
 			if ((lastIncludedDeviceAtController != -1)
 					// checks that the device is not the last included before
 					&& (lastIncludedDeviceAtController != this.lastIncludedDevice)
 					// checks that the device is not already included and
 					// running
-					&& (this.handler.getControllableDeviceURIFromNodeId(
-							lastIncludedDeviceAtController) == null)
+					&& (this.handler.getControllableDeviceURIFromNodeId(lastIncludedDeviceAtController) == null)
 					// checks that there are supported devices
-					&& (this.supportedDevices != null)
-					&& (!this.supportedDevices.isEmpty()))
+					&& (this.supportedDevices != null) && (!this.supportedDevices.isEmpty()))
 			{
 
 				// get the device data
-				Device newDeviceData = this.handler
-						.getRawDevice(lastIncludedDeviceAtController);
+				Device newDeviceData = this.handler.getRawDevice(lastIncludedDeviceAtController);
 
 				// build the device descriptor
-				DeviceDescriptor descriptorToAdd = this.buildDeviceDescriptor(
-						newDeviceData, lastIncludedDeviceAtController);
+				DeviceDescriptor descriptorToAdd = this.buildDeviceDescriptor(newDeviceData,
+						lastIncludedDeviceAtController);
 
 				// check not null
 				if (descriptorToAdd != null)
@@ -314,17 +302,14 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 		/*-------------- HANDLE DISASSOCIATION ------------------------*/
 
 		// check if any new device has been recently disassociated
-		int lastExcludedDeviceAtController = controller.getData()
-				.getLastExcludedDevice();
-		if ((lastExcludedDeviceAtController != -1)
-				&& (lastExcludedDeviceAtController != this.lastExcludedDevice))
+		int lastExcludedDeviceAtController = controller.getData().getLastExcludedDevice();
+		if ((lastExcludedDeviceAtController != -1) && (lastExcludedDeviceAtController != this.lastExcludedDevice))
 		{
 			// update the last included device
 			this.lastExcludedDevice = lastExcludedDeviceAtController;
 
 			// get the device URI
-			String deviceId = this.handler.getControllableDeviceURIFromNodeId(
-					this.lastExcludedDevice);
+			String deviceId = this.handler.getControllableDeviceURIFromNodeId(this.lastExcludedDevice);
 
 			// remove the device (if not null)
 			if ((deviceId != null) && (!deviceId.isEmpty()))
@@ -340,29 +325,23 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 		/*-------------- HANDLE STATE ----------------------------*/
 		if (this.currentState != null)
 		{
-			int controllerState = this.controller.getData()
-					.getControllerState();
+			int controllerState = this.controller.getData().getControllerState();
 
 			// handle controller states
 			switch (controllerState)
 			{
 				case 0: // idle
 				{
-					State currentAssociationState = this.currentState.getState(
-							DeviceAssociationState.class.getSimpleName());
-					if ((currentAssociationState != null)
-							&& (currentAssociationState
-									.getCurrentStateValue()[0].getClass()
-											.getName()
-											.equals(AssociatingStateValue.class
-													.getName())))
+					State currentAssociationState = this.currentState
+							.getState(DeviceAssociationState.class.getSimpleName());
+					if ((currentAssociationState != null) && (currentAssociationState.getCurrentStateValue()[0]
+							.getClass().getName().equals(AssociatingStateValue.class.getName())))
 					{
 						// enable dynamic device detection
 						this.detectionEnabled = true;
 					}
 
-					if (this.changeState(
-							new DeviceAssociationState(new IdleStateValue())))
+					if (this.changeState(new DeviceAssociationState(new IdleStateValue())))
 						// notify the current idle state
 						this.notifyIdle();
 
@@ -370,8 +349,7 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 				}
 				case 1: // associating
 				{
-					if (this.changeState(new DeviceAssociationState(
-							new AssociatingStateValue())))
+					if (this.changeState(new DeviceAssociationState(new AssociatingStateValue())))
 						// notify the current associating state
 						this.notifyAssociating();
 
@@ -379,8 +357,7 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 				}
 				case 5: // disassociating
 				{
-					if (this.changeState(new DeviceAssociationState(
-							new DisassociatingStateValue())))
+					if (this.changeState(new DeviceAssociationState(new DisassociatingStateValue())))
 						// notify the current disassociating state
 						this.notifyDisassociating();
 
@@ -401,22 +378,20 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 	}
 
 	@Override
-	protected ZWaveNodeInfo createNodeInfo(int deviceId,
-			Set<Integer> instancesId, boolean isController)
+	protected ZWaveNodeInfo createNodeInfo(int deviceId, Set<Integer> instancesId, boolean isController)
 	{
 		HashMap<Integer, Set<Integer>> instanceCommand = new HashMap<Integer, Set<Integer>>();
 
 		// this is the gateway so we are not really interested in command class
 		// for sensor data update
 		HashSet<Integer> ccSet = new HashSet<Integer>();
-		ccSet.add(ZWaveAPI.COMMAND_CLASS_BASIC);
+		ccSet.add(ZWaveRawCommandClass.COMMAND_CLASS_BASIC);
 
 		for (Integer instanceId : instancesId)
 		{
 			instanceCommand.put(instanceId, ccSet);
 		}
-		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(this.gatewayEndpoint,
-				deviceId, instanceCommand, isController);
+		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(this.gatewayEndpoint, deviceId, instanceCommand, isController);
 
 		return nodeInfo;
 	}
@@ -433,15 +408,13 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 	 * @param supportedDevices
 	 *            the supportedDevices to set
 	 */
-	public void setSupportedDevices(
-			ConcurrentHashMap<String, String> supportedDevices)
+	public void setSupportedDevices(ConcurrentHashMap<String, String> supportedDevices)
 	{
 		// simplest updated policy : replacement
 		this.supportedDevices = supportedDevices;
 
 		// debug
-		this.logger.log(LogService.LOG_DEBUG,
-				"Updated dynamic device creation db");
+		this.logger.debug("Updated dynamic device creation db");
 	}
 
 	/**
@@ -520,8 +493,7 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 			// avoid any discovery during the associating / disassociating state
 
 			// build the device descriptor
-			DeviceDescriptor descriptorToAdd = this
-					.buildDeviceDescriptor(discoveredDevice, nodeId);
+			DeviceDescriptor descriptorToAdd = this.buildDeviceDescriptor(discoveredDevice, nodeId);
 
 			// check not null
 			if (descriptorToAdd != null)
@@ -536,8 +508,7 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 	}
 
 	@Override
-	public void detectedNotExistingZWaveDevice(Device notExistingDevice,
-			int nodeId)
+	public void detectedNotExistingZWaveDevice(Device notExistingDevice, int nodeId)
 	{
 		// device auto-removal is only enabled when the gateway is idle and not
 		// handling association and/or disassociation
@@ -553,8 +524,7 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 			// referring to a certain node id when the same id is assigned to a
 			// different device. this is the case when, for example the ZWay
 			// server used by dog is changed without cleaning the configuration.
-			String deviceUrl = this.handler
-					.getControllableDeviceURIFromNodeId(nodeId);
+			String deviceUrl = this.handler.getControllableDeviceURIFromNodeId(nodeId);
 			this.deviceFactory.removeDevice(deviceUrl);
 		}
 
@@ -565,12 +535,10 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 		// the idle flag, initially false
 		boolean idle = false;
 		// the current association state for this gateway
-		State currentAssociationState = this.currentState
-				.getState(DeviceAssociationState.class.getSimpleName());
+		State currentAssociationState = this.currentState.getState(DeviceAssociationState.class.getSimpleName());
 		// check if idle
-		if ((currentAssociationState != null)
-				&& (currentAssociationState.getCurrentStateValue()[0].getClass()
-						.getName().equals(IdleStateValue.class.getName())))
+		if ((currentAssociationState != null) && (currentAssociationState.getCurrentStateValue()[0].getClass().getName()
+				.equals(IdleStateValue.class.getName())))
 			idle = true;
 		// return the idel state
 		return idle;
@@ -589,13 +557,10 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 			DeviceData deviceData = device.getData();
 
 			// get the manufacturer id
-			String manufacturerId = deviceData.getAllData()
-					.get(DataConst.MANUFACTURER_ID).getValue().toString();
-			String manufacturerProductType = deviceData.getAllData()
-					.get(DataConst.MANUFACTURER_PRODUCT_TYPE).getValue()
+			String manufacturerId = deviceData.getAllData().get(DataConst.MANUFACTURER_ID).getValue().toString();
+			String manufacturerProductType = deviceData.getAllData().get(DataConst.MANUFACTURER_PRODUCT_TYPE).getValue()
 					.toString();
-			String manufacturerProductId = deviceData.getAllData()
-					.get(DataConst.MANUFACTURER_PRODUCT_ID).getValue()
+			String manufacturerProductId = deviceData.getAllData().get(DataConst.MANUFACTURER_PRODUCT_ID).getValue()
 					.toString();
 
 			// wait for instances to be read.... (may be read with a certain
@@ -606,27 +571,23 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 			}
 			catch (InterruptedException e1)
 			{
-				this.logger.log(LogService.LOG_WARNING,
+				this.logger.warn(
 						"Instance wait time was less than necessary due to interrupted thread, device instantiation might not be accurate.",
 						e1);
 			}
 
 			// build the 4th id (number of instances)
-			int numberOfInstances = this.handler.getRawDevice(nodeId)
-					.getInstances().size();
+			int numberOfInstances = this.handler.getRawDevice(nodeId).getInstances().size();
 
 			// build the device unique id
-			String extendedDeviceUniqueId = manufacturerId + "-"
-					+ manufacturerProductType + "-" + manufacturerProductId
+			String extendedDeviceUniqueId = manufacturerId + "-" + manufacturerProductType + "-" + manufacturerProductId
 					+ "-" + numberOfInstances;
 
 			// build the device unique id
-			String deviceUniqueId = manufacturerId + "-"
-					+ manufacturerProductType + "-" + manufacturerProductId;
+			String deviceUniqueId = manufacturerId + "-" + manufacturerProductType + "-" + manufacturerProductId;
 
 			// get the device class
-			String deviceClass = this.supportedDevices
-					.get(extendedDeviceUniqueId);
+			String deviceClass = this.supportedDevices.get(extendedDeviceUniqueId);
 
 			// check if not extended
 			if (deviceClass == null)
@@ -640,22 +601,17 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 
 				// store the device name
 				descriptorDefinitionData.put(DeviceDescriptorFactory.NAME,
-						UUID.nameUUIDFromBytes(((this.gatewayEndpoint + "_"
-								+ deviceClass + "_" + nodeId)).getBytes())
+						UUID.nameUUIDFromBytes(((this.gatewayEndpoint + "_" + deviceClass + "_" + nodeId)).getBytes())
 								.toString());
 
 				// store the device description
-				descriptorDefinitionData.put(
-						DeviceDescriptorFactory.DESCRIPTION,
-						"New Device of type " + deviceClass);
+				descriptorDefinitionData.put(DeviceDescriptorFactory.DESCRIPTION, "New Device of type " + deviceClass);
 
 				// store the device gateway
-				descriptorDefinitionData.put(DeviceDescriptorFactory.GATEWAY,
-						this.device.getDeviceId());
+				descriptorDefinitionData.put(DeviceDescriptorFactory.GATEWAY, this.device.getDeviceId());
 
 				// store the device location
-				descriptorDefinitionData.put(DeviceDescriptorFactory.LOCATION,
-						"");
+				descriptorDefinitionData.put(DeviceDescriptorFactory.LOCATION, "");
 
 				// store the node id
 				descriptorDefinitionData.put("nodeId", "" + nodeId);
@@ -677,21 +633,16 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 				// get the device descriptor
 				try
 				{
-					descriptor = this.descriptorFactory.getDescriptor(
-							descriptorDefinitionData, deviceClass);
+					descriptor = this.descriptorFactory.getDescriptor(descriptorDefinitionData, deviceClass);
 				}
 				catch (Exception e)
 				{
-					this.logger.log(LogService.LOG_ERROR,
-							"Error while creating DeviceDescriptor for the just added device ",
-							e);
+					this.logger.error("Error while creating DeviceDescriptor for the just added device ", e);
 				}
 
 				// debug dump
-				this.logger.log(LogService.LOG_INFO,
-						"Detected new device: \n\tdeviceUniqueId: "
-								+ deviceUniqueId + "\n\tnodeId: " + nodeId
-								+ "\n\tdeviceClass: " + deviceClass);
+				this.logger.info("Detected new device: \n\tdeviceUniqueId: " + deviceUniqueId + "\n\tnodeId: " + nodeId
+						+ "\n\tdeviceClass: " + deviceClass);
 			}
 		}
 
@@ -737,26 +688,20 @@ public class ZWaveGatewayDriverInstance extends ZWaveDriverInstance
 
 		// get the current state
 		String currentStateValue = "";
-		State state = currentState
-				.getState(DeviceAssociationState.class.getSimpleName());
+		State state = currentState.getState(DeviceAssociationState.class.getSimpleName());
 
 		if (state != null)
-			currentStateValue = (String) state.getCurrentStateValue()[0]
-					.getValue();
+			currentStateValue = (String) state.getCurrentStateValue()[0].getValue();
 
 		// check that the state has changed
-		if (!currentStateValue
-				.equals(newState.getCurrentStateValue()[0].getValue()))
+		if (!currentStateValue.equals(newState.getCurrentStateValue()[0].getValue()))
 		{
 			// update the current state
-			this.currentState.setState(
-					DeviceAssociationState.class.getSimpleName(), newState);
+			this.currentState.setState(DeviceAssociationState.class.getSimpleName(), newState);
 
 			// debug
-			logger.log(LogService.LOG_DEBUG,
-					ZWaveGatewayDriverInstance.LOG_ID + "Device "
-							+ device.getDeviceId() + " is now "
-							+ (newState).getCurrentStateValue()[0].getValue());
+			logger.debug(ZWaveGatewayDriverInstance.LOG_ID + "Device " + device.getDeviceId() + " is now "
+					+ (newState).getCurrentStateValue()[0].getValue());
 
 			// update the status
 			this.updateStatus();

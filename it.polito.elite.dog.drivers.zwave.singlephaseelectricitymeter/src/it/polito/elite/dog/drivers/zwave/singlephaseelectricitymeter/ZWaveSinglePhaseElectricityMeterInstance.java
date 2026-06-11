@@ -17,29 +17,6 @@
  */
 package it.polito.elite.dog.drivers.zwave.singlephaseelectricitymeter;
 
-import it.polito.elite.dog.core.library.model.ControllableDevice;
-import it.polito.elite.dog.core.library.model.DeviceStatus;
-import it.polito.elite.dog.core.library.model.devicecategory.Controllable;
-import it.polito.elite.dog.core.library.model.devicecategory.SinglePhaseActivePowerMeter;
-import it.polito.elite.dog.core.library.model.devicecategory.SinglePhaseElectricityMeter;
-import it.polito.elite.dog.core.library.model.devicecategory.SinglePhaseEnergyMeter;
-import it.polito.elite.dog.core.library.model.state.SinglePhaseActiveEnergyState;
-import it.polito.elite.dog.core.library.model.state.SinglePhaseActivePowerMeasurementState;
-import it.polito.elite.dog.core.library.model.statevalue.ActiveEnergyStateValue;
-import it.polito.elite.dog.core.library.model.statevalue.ActivePowerStateValue;
-import it.polito.elite.dog.core.library.model.statevalue.StateValue;
-import it.polito.elite.dog.core.library.util.LogHelper;
-import it.polito.elite.dog.drivers.zwave.ZWaveAPI;
-import it.polito.elite.dog.drivers.zwave.model.zway.json.CommandClasses;
-import it.polito.elite.dog.drivers.zwave.model.zway.json.Controller;
-import it.polito.elite.dog.drivers.zwave.model.zway.json.DataElemObject;
-import it.polito.elite.dog.drivers.zwave.model.zway.json.Device;
-import it.polito.elite.dog.drivers.zwave.model.zway.json.Instance;
-import it.polito.elite.dog.drivers.zwave.network.ZWaveDriverInstance;
-import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
-import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
-import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
-
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
@@ -53,24 +30,43 @@ import javax.measure.unit.Unit;
 import javax.measure.unit.UnitFormat;
 
 import org.osgi.framework.BundleContext;
-import org.osgi.service.log.LogService;
+import org.osgi.service.log.Logger;
 
-public class ZWaveSinglePhaseElectricityMeterInstance
-		extends ZWaveDriverInstance implements SinglePhaseElectricityMeter
+import it.polito.elite.dog.core.library.model.ControllableDevice;
+import it.polito.elite.dog.core.library.model.DeviceStatus;
+import it.polito.elite.dog.core.library.model.devicecategory.Controllable;
+import it.polito.elite.dog.core.library.model.devicecategory.SinglePhaseActivePowerMeter;
+import it.polito.elite.dog.core.library.model.devicecategory.SinglePhaseElectricityMeter;
+import it.polito.elite.dog.core.library.model.devicecategory.SinglePhaseEnergyMeter;
+import it.polito.elite.dog.core.library.model.state.SinglePhaseActiveEnergyState;
+import it.polito.elite.dog.core.library.model.state.SinglePhaseActivePowerMeasurementState;
+import it.polito.elite.dog.core.library.model.statevalue.ActiveEnergyStateValue;
+import it.polito.elite.dog.core.library.model.statevalue.ActivePowerStateValue;
+import it.polito.elite.dog.core.library.model.statevalue.StateValue;
+import it.polito.elite.dog.drivers.zwave.model.ZWaveRawCommandClass;
+import it.polito.elite.dog.drivers.zwave.model.zway.json.CommandClasses;
+import it.polito.elite.dog.drivers.zwave.model.zway.json.Controller;
+import it.polito.elite.dog.drivers.zwave.model.zway.json.DataElemObject;
+import it.polito.elite.dog.drivers.zwave.model.zway.json.Device;
+import it.polito.elite.dog.drivers.zwave.model.zway.json.Instance;
+import it.polito.elite.dog.drivers.zwave.network.ZWaveDriverInstance;
+import it.polito.elite.dog.drivers.zwave.network.info.ZWaveNodeInfo;
+import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetwork;
+import it.polito.elite.dog.drivers.zwave.network.interfaces.ZWaveNetworkHandler;
+
+public class ZWaveSinglePhaseElectricityMeterInstance extends ZWaveDriverInstance implements SinglePhaseElectricityMeter
 {
 	// the class logger
-	private LogHelper logger;
+	private Logger logger;
 
-	public ZWaveSinglePhaseElectricityMeterInstance(ZWaveNetwork network,
-			ControllableDevice device, int deviceId, Set<Integer> instancesId,
-			String gatewayEndpoint, int gatewayNodeId, int updateTimeMillis,
+	public ZWaveSinglePhaseElectricityMeterInstance(ZWaveNetwork network, ControllableDevice device, int deviceId,
+			Set<Integer> instancesId, String gatewayEndpoint, int gatewayNodeId, int updateTimeMillis, Logger logger,
 			BundleContext context)
 	{
-		super(network, device, deviceId, instancesId, gatewayEndpoint,
-				gatewayNodeId, updateTimeMillis, context);
+		super(network, device, deviceId, instancesId, gatewayEndpoint, gatewayNodeId, updateTimeMillis, context);
 
 		// create a logger
-		logger = new LogHelper(context);
+		this.logger = logger;
 
 		// initialize states
 		this.initializeStates();
@@ -92,15 +88,10 @@ public class ZWaveSinglePhaseElectricityMeterInstance
 		uf.label(SI.KILO(VAR.times(NonSI.HOUR)), "kVarh");
 
 		// initialize the state
-		this.currentState.setState(
-				SinglePhaseActiveEnergyState.class.getSimpleName(),
-				new SinglePhaseActiveEnergyState(
-						new StateValue[] { new ActiveEnergyStateValue() }));
-		this.currentState.setState(
-				SinglePhaseActivePowerMeasurementState.class.getSimpleName(),
-				new SinglePhaseActivePowerMeasurementState(
-						new StateValue[] { new ActivePowerStateValue() }));
-
+		this.currentState.setState(SinglePhaseActiveEnergyState.class.getSimpleName(),
+				new SinglePhaseActiveEnergyState(new StateValue[] { new ActiveEnergyStateValue() }));
+		this.currentState.setState(SinglePhaseActivePowerMeasurementState.class.getSimpleName(),
+				new SinglePhaseActivePowerMeasurementState(new StateValue[] { new ActivePowerStateValue() }));
 
 		// get the initial state of the device
 		Runnable worker = new Runnable()
@@ -124,8 +115,7 @@ public class ZWaveSinglePhaseElectricityMeterInstance
 	}
 
 	@Override
-	public void newMessageFromHouse(Device deviceNode, Instance instanceNode,
-			Controller controllerNode, String sValue)
+	public void newMessageFromHouse(Device deviceNode, Instance instanceNode, Controller controllerNode, String sValue)
 	{
 		this.deviceNode = deviceNode;
 
@@ -135,7 +125,7 @@ public class ZWaveSinglePhaseElectricityMeterInstance
 		// devices.X.instances.x.commandClasses.50.data.0 (KwH) and
 		// devices.X.instances.x.commandClasses.50.data.2 (W)
 		CommandClasses ccElectricityEntry = instanceNode.getCommandClasses()
-				.get(ZWaveAPI.COMMAND_CLASS_METER);
+				.get(ZWaveRawCommandClass.COMMAND_CLASS_METER);
 
 		//
 		if (ccElectricityEntry != null)
@@ -170,8 +160,7 @@ public class ZWaveSinglePhaseElectricityMeterInstance
 					DataElemObject energyEntry = ccElectricityEntry.get("0");
 					if (energyEntry != null)
 					{
-						this.changeActiveEnergyState(Double.valueOf(energyEntry
-								.getDataElemValue("val").toString()));
+						this.changeActiveEnergyState(Double.valueOf(energyEntry.getDataElemValue("val").toString()));
 
 						energyUpdated = true;
 
@@ -181,8 +170,7 @@ public class ZWaveSinglePhaseElectricityMeterInstance
 					DataElemObject powerEntry = ccElectricityEntry.get("2");
 					if (powerEntry != null)
 					{
-						this.changeActivePowerState(Double.valueOf(
-								powerEntry.getDataElemValue("val").toString()));
+						this.changeActivePowerState(Double.valueOf(powerEntry.getDataElemValue("val").toString()));
 
 						powerUpdated = true;
 
@@ -205,18 +193,15 @@ public class ZWaveSinglePhaseElectricityMeterInstance
 	private void changeActiveEnergyState(double activeEnergy)
 	{
 		// build the energy measure
-		DecimalMeasure<?> value = DecimalMeasure.valueOf(activeEnergy + " "
-				+ SI.KILO(SI.WATT.times(NonSI.HOUR)).toString());
+		DecimalMeasure<?> value = DecimalMeasure
+				.valueOf(activeEnergy + " " + SI.KILO(SI.WATT.times(NonSI.HOUR)).toString());
 
 		// update the state
-		this.currentState
-				.getState(SinglePhaseActiveEnergyState.class.getSimpleName())
-				.getCurrentStateValue()[0].setValue(value);
-
+		this.currentState.getState(SinglePhaseActiveEnergyState.class.getSimpleName()).getCurrentStateValue()[0]
+				.setValue(value);
 
 		// debug
-		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
-				+ " active energy " + value.toString());
+		logger.debug("Device " + device.getDeviceId() + " active energy " + value.toString());
 
 		// notify energy change
 		this.notifyNewActiveEnergyValue(value);
@@ -233,17 +218,14 @@ public class ZWaveSinglePhaseElectricityMeterInstance
 	private void changeActivePowerState(double activePower)
 	{
 		// build the power measure
-		DecimalMeasure<?> powerValue = DecimalMeasure
-				.valueOf(activePower + " " + SI.WATT.toString());
+		DecimalMeasure<?> powerValue = DecimalMeasure.valueOf(activePower + " " + SI.WATT.toString());
 
 		// update the state
-		this.currentState.getState(
-				SinglePhaseActivePowerMeasurementState.class.getSimpleName())
+		this.currentState.getState(SinglePhaseActivePowerMeasurementState.class.getSimpleName())
 				.getCurrentStateValue()[0].setValue(powerValue);
 
 		// debug
-		logger.log(LogService.LOG_DEBUG, "Device " + device.getDeviceId()
-				+ " active power " + powerValue.toString());
+		logger.debug("Device " + device.getDeviceId() + " active power " + powerValue.toString());
 
 		// notify the state change
 		this.notifyNewActivePowerValue(powerValue);
@@ -272,16 +254,14 @@ public class ZWaveSinglePhaseElectricityMeterInstance
 	@Override
 	public Measure<?, ?> getActiveEnergyValue()
 	{
-		return (Measure<?, ?>) currentState
-				.getState(SinglePhaseActiveEnergyState.class.getSimpleName())
+		return (Measure<?, ?>) currentState.getState(SinglePhaseActiveEnergyState.class.getSimpleName())
 				.getCurrentStateValue()[0].getValue();
 	}
 
 	@Override
 	public Measure<?, ?> getActivePower()
 	{
-		return (Measure<?, ?>) currentState.getState(
-				SinglePhaseActivePowerMeasurementState.class.getSimpleName())
+		return (Measure<?, ?>) currentState.getState(SinglePhaseActivePowerMeasurementState.class.getSimpleName())
 				.getCurrentStateValue()[0].getValue();
 	}
 
@@ -296,13 +276,11 @@ public class ZWaveSinglePhaseElectricityMeterInstance
 	public void notifyNewActivePowerValue(Measure<?, ?> powerValue)
 	{
 		// notify the new measure
-		((SinglePhaseActivePowerMeter) device)
-				.notifyNewActivePowerValue(powerValue);
+		((SinglePhaseActivePowerMeter) device).notifyNewActivePowerValue(powerValue);
 	}
 
 	@Override
-	protected ZWaveNodeInfo createNodeInfo(int deviceId,
-			Set<Integer> instancesId, boolean isController)
+	protected ZWaveNodeInfo createNodeInfo(int deviceId, Set<Integer> instancesId, boolean isController)
 	{
 		HashMap<Integer, Set<Integer>> instanceCommand = new HashMap<Integer, Set<Integer>>();
 
@@ -312,13 +290,12 @@ public class ZWaveSinglePhaseElectricityMeterInstance
 		for (Integer instanceId : instancesId)
 		{
 			HashSet<Integer> ccSet = new HashSet<Integer>();
-			ccSet.add(ZWaveAPI.COMMAND_CLASS_METER);
-			ccSet.add(ZWaveAPI.COMMAND_CLASS_SENSOR_MULTILEVEL);
+			ccSet.add(ZWaveRawCommandClass.COMMAND_CLASS_METER);
+			ccSet.add(ZWaveRawCommandClass.COMMAND_CLASS_SENSOR_MULTILEVEL);
 			instanceCommand.put(instanceId, ccSet);
 
 		}
-		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(this.gatewayEndpoint,
-				deviceId, instanceCommand, isController);
+		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(this.gatewayEndpoint, deviceId, instanceCommand, isController);
 
 		return nodeInfo;
 	}

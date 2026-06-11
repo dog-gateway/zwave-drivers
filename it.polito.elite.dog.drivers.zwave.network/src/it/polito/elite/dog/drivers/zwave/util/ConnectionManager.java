@@ -18,20 +18,25 @@
 package it.polito.elite.dog.drivers.zwave.util;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
+import java.net.Authenticator;
+import java.net.PasswordAuthentication;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.http.HttpResponse.BodyHandlers;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
-import org.osgi.service.log.LogService;
+import org.osgi.service.log.Logger;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import it.polito.elite.dog.core.library.util.LogHelper;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.ZWaveModelTree;
 
 public class ConnectionManager
@@ -39,14 +44,13 @@ public class ConnectionManager
 	// the log identifier, unique for the class
 	public static String LOG_ID = "[ZWaveConnessionManager]: ";
 
-	public static final String DATA_PATH = "/ZWaveAPI/Data";
-	public static final String RUN_PATH = "/ZWaveAPI/Run";
-	private static ConnectionManager connectionManager = null;
+	public static final String DATA_PATH = "/ZWaveAPI/Data/";
+	public static final String RUN_PATH = "/ZWaveAPI/Run/";
+	private static final Duration API_REQUEST_TIMEOUT = Duration.of(30, ChronoUnit.SECONDS);
 
-	protected String sURL;
+	protected URI baseURL;
 
-	protected Client client;
-	protected WebTarget service;
+	protected HttpClient hClient;
 	private String sLastError;
 
 	// Tree representing system status
@@ -62,82 +66,35 @@ public class ConnectionManager
 	long lastUpdate = 0;
 
 	// the logger
-	LogHelper logger;
+	private Logger logger;
 
-	@SuppressWarnings("deprecation")
-	public ConnectionManager(String sURL, String sUser, String sPassword,
-			LogHelper logger)
+	public ConnectionManager(String sURL, String sUser, String sPassword, Logger logger)
 	{
-		this.sURL = sURL;
+		// handle possible ending slash on the URL
+		this.baseURL = URI.create(sURL);
 		this.logger = logger;
 
 		// if credentials are specified, create an authenticated client,
 		// otherwise a simple one.
-		if ((sUser != null) && (!sUser.isEmpty()) && (sPassword != null)
-				&& (!sPassword.isEmpty()))
+		if ((sUser != null) && (!sUser.isEmpty()) && (sPassword != null) && (!sPassword.isEmpty()))
 		{
 			// create authenticated client
-			try
+			this.hClient = HttpClient.newBuilder().authenticator(new Authenticator()
 			{
-				client = ClientBuilder.newBuilder()
-						.register(
-								new BasicAuthenticationFilter(sUser, sPassword))
-						.build();
-			}
-			catch (UnsupportedEncodingException e)
-			{
-				logger.log(LogService.LOG_ERROR,
-						"Unable to correctly set Basic authentication parameters",
-						e);
-			}
+				@Override
+				protected PasswordAuthentication getPasswordAuthentication()
+				{
+					return new PasswordAuthentication(sUser, sPassword.toCharArray());
+				}
+			}).connectTimeout(Duration.of(10, ChronoUnit.SECONDS)).build();
+
 		}
 		else
 		{
 			// create simple client
-			client = ClientBuilder.newBuilder().build();
+			this.hClient = HttpClient.newHttpClient();
 		}
-		service = client.target(sURL);
 	}
-	
-	/*------ SINGLETON -------*/
-	
-	//inherited from the previous single-gateway implementation
-	//needs to be revised and possibly deleted if not needed.
-
-	/**
-	 * Obtain the current ConnessionManager
-	 * 
-	 * @return ConnessionManager, may be null
-	 */
-	public static ConnectionManager get()
-	{
-		return connectionManager;
-	}
-
-	/**
-	 * Obtain an instance of ConnessionManager, with the given params. If one of
-	 * them changed or if no ConnessionManager already exists, a new one is
-	 * created
-	 * 
-	 * @param sURL
-	 * @param sUser
-	 * @param sPassword
-	 * @return ConnessionManager
-	 */
-	public static ConnectionManager get(String sURL, String sUser,
-			String sPassword, LogHelper logger)
-	{
-		// create a new instance if needed, or returns the current one
-		if (connectionManager == null
-				|| !sURL.equals(connectionManager.getURL()))
-
-			connectionManager = new ConnectionManager(sURL, sUser, sPassword,
-					logger);
-
-		return connectionManager;
-	}
-	
-	/*----- END SINGLETON ------*/
 
 	/**
 	 * Query zway-server for an update of the system status since the lSince
@@ -153,12 +110,25 @@ public class ConnectionManager
 	 */
 	public ZWaveModelTree updateDevices(long lSince) throws Exception
 	{
-		Response response = service.path(DATA_PATH).path(String.valueOf(lSince))// after ZWay2.3.x lsince no longer works
-				.request(MediaType.APPLICATION_JSON).get(); // was post, after ZWay2.3.xpost no longer works from Jersey
+		HttpRequest request = HttpRequest.newBuilder(this.baseURL.resolve(DATA_PATH)).timeout(API_REQUEST_TIMEOUT)
+				.header("Content-type", "application/json").GET().build();
 
-		if (response.getStatus() == Status.OK.getStatusCode())
+		HttpResponse<String> response = null;
+		try
 		{
-			String json = response.readEntity(String.class);
+			response = this.hClient.send(request, BodyHandlers.ofString());
+		}
+		catch (IOException | InterruptedException e)
+		{
+			this.logger.warn(String.format("Unable to update device: %s", e));
+			throw e;
+		}
+
+		// if it comes here, response is not null, check the response status
+		if (response.statusCode() == Status.OK.getStatusCode())
+		{
+
+			String json = response.body();// response.readEntity(String.class);
 
 			// Convert JSON to Java object
 			try
@@ -168,15 +138,13 @@ public class ConnectionManager
 				{
 					// System.out.println(json);//use
 					// http://jsoneditoronline.org/ for a friendly UI
-					zWaveModelTree = mapper.readValue(json,
-							ZWaveModelTree.class);
+					zWaveModelTree = mapper.readValue(json, ZWaveModelTree.class);
 					zWaveTree = mapper.readTree(json);
 				}
 				else
 				// otherwise we proceed to update the tree
 				{
-					zWaveModelTree = JsonUpdate.updateModel(mapper, zWaveTree,
-							json);// devices.26.instances.0.commandClasses.49.data.1.val
+					zWaveModelTree = JsonUpdate.updateModel(mapper, zWaveTree, json);// devices.26.instances.0.commandClasses.49.data.1.val
 				}
 			}
 			catch (IOException e)
@@ -187,8 +155,8 @@ public class ConnectionManager
 		}
 		else
 		{
-			throw new Exception("Can't read json from Z-Way server: "
-					+ response.toString());
+			this.logger.error(String.format("unable to read from Z-Way server: %s", response.body()));
+			throw new Exception("Can't read json from Z-Way server: " + response.body());
 		}
 
 		return zWaveModelTree;
@@ -235,22 +203,17 @@ public class ConnectionManager
 
 	public String sendCommand(String sCommand) throws Exception
 	{
-		String jsonResponse = null;
+		HttpRequest request = HttpRequest
+				.newBuilder(this.baseURL.resolve( RUN_PATH).resolve( URLEncoder.encode(sCommand, StandardCharsets.UTF_8)))
+				.timeout(API_REQUEST_TIMEOUT).GET().build();
+		HttpResponse<String> response = this.hClient.send(request, BodyHandlers.ofString());
 
-		Response response = service.path(RUN_PATH).path(sCommand)
-				.request(MediaType.APPLICATION_JSON_TYPE).get(); // was post, after razberry 2.3.x post no longer works from Jersey
-
-		if (response.getStatus() == Status.OK.getStatusCode())
+		if (response.statusCode() != Status.OK.getStatusCode())
 		{
-			jsonResponse = response.readEntity(String.class);
-		}
-		else
-		{
-			throw new Exception("Can't read json from Z-Way server: "
-					+ response.toString());
+			throw new Exception("Can't read json from Z-Way server: " + response.toString());
 		}
 
-		return jsonResponse;
+		return response.body();
 	}
 
 	public String pingDevice(String sNodeId) throws Exception
@@ -260,7 +223,7 @@ public class ConnectionManager
 
 	public String getURL()
 	{
-		return sURL;
+		return this.baseURL.toString();
 	}
 
 	public String getLastError()

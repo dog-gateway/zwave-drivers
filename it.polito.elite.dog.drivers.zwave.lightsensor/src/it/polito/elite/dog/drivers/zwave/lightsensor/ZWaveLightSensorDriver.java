@@ -36,13 +36,11 @@ public class ZWaveLightSensorDriver extends ZWaveDeviceDriver
 	}
 
 	@Override
-	public ZWaveDriverInstance createZWaveDriverInstance(
-			ZWaveNetwork zWaveNetwork, ControllableDevice device, int nodeId,
-			HashSet<Integer> instancesId, String gatewayEndpoint,
-			int gatewayNodeId, int updateTimeMillis, BundleContext context)
+	public ZWaveDriverInstance createZWaveDriverInstance(ZWaveNetwork zWaveNetwork, ControllableDevice device,
+			int nodeId, HashSet<Integer> instancesId, String gatewayEndpoint, int gatewayNodeId, int updateTimeMillis,
+			BundleContext context)
 	{
-		return new ZWaveLightSensorDriverInstance(zWaveNetwork, device, nodeId,
-				instancesId, gatewayEndpoint, gatewayNodeId, updateTimeMillis,
-				context);
+		return new ZWaveLightSensorDriverInstance(zWaveNetwork, device, nodeId, instancesId, gatewayEndpoint,
+				gatewayNodeId, updateTimeMillis, this.logger, context);
 	}
 }

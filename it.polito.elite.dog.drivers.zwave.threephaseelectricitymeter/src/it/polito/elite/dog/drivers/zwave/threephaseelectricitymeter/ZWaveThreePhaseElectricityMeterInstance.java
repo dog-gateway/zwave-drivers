@@ -35,7 +35,7 @@ import it.polito.elite.dog.core.library.model.state.ThreePhaseVoltageState;
 import it.polito.elite.dog.core.library.model.statevalue.ActiveEnergyStateValue;
 import it.polito.elite.dog.core.library.model.statevalue.ActivePowerStateValue;
 import it.polito.elite.dog.core.library.model.statevalue.StateValue;
-import it.polito.elite.dog.drivers.zwave.ZWaveAPI;
+import it.polito.elite.dog.drivers.zwave.model.ZWaveRawCommandClass;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.CommandClasses;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.Controller;
 import it.polito.elite.dog.drivers.zwave.model.zway.json.DataElemObject;
@@ -179,7 +179,7 @@ public class ZWaveThreePhaseElectricityMeterInstance extends ZWaveDriverInstance
 		// devices.X.instances.1.commandClasses.50.data.0 (KwH) and
 		// devices.X.instances.1.commandClasses.50.data.2 (W)
 		CommandClasses ccElectricityEntry = instanceNode.getCommandClasses()
-				.get(ZWaveAPI.COMMAND_CLASS_METER);
+				.get(ZWaveRawCommandClass.COMMAND_CLASS_METER);
 
 		// tin pants...
 		if (ccElectricityEntry != null)
@@ -272,8 +272,8 @@ public class ZWaveThreePhaseElectricityMeterInstance extends ZWaveDriverInstance
 		for (Integer instanceId : instancesId)
 		{
 			HashSet<Integer> ccSet = new HashSet<Integer>();
-			ccSet.add(ZWaveAPI.COMMAND_CLASS_METER);
-			ccSet.add(ZWaveAPI.COMMAND_CLASS_SENSOR_MULTILEVEL);
+			ccSet.add(ZWaveRawCommandClass.COMMAND_CLASS_METER);
+			ccSet.add(ZWaveRawCommandClass.COMMAND_CLASS_SENSOR_MULTILEVEL);
 			instanceCommand.put(instanceId, ccSet);
 		}
 		ZWaveNodeInfo nodeInfo = new ZWaveNodeInfo(this.gatewayEndpoint,
