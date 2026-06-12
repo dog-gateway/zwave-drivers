@@ -4,7 +4,7 @@ Automatic-Module-Name: it.polito.elite.dog.drivers.zwave.network
 Bundle-Name: ZWaveNetworkDriver
 Bundle-SymbolicName: it.polito.elite.dog.drivers.zwave.network
 Bundle-Version: 1.1.0
-Bundle-RequiredExecutionEnvironment: JavaSE-1.8
+Bundle-RequiredExecutionEnvironment: JavaSE-17
 Service-Component: OSGI-INF/component.xml
 Export-Package: it.polito.elite.dog.drivers.zwave.model,
  it.polito.elite.dog.drivers.zwave.model.commandclasses,
